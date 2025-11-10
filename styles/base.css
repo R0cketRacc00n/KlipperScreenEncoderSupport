@@ -21,6 +21,22 @@
     border: 0;
 }
 
+button.dialog-info:focus,
+button.dialog-warning:focus,
+button.dialog-error:focus,
+button.dialog-primary:focus,
+button.color1:focus,
+button.color2:focus,
+button.color3:focus,
+button.color4:focus,
+button:focus {
+    color: yellow;
+    background-color: @active;
+    border-color: red;
+    border: .15em;
+    border-style: solid;
+}
+
 button:disabled {
     opacity: .5;
 }

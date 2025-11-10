@@ -34,6 +34,17 @@ from ks_includes.widgets.screensaver import ScreenSaver
 from ks_includes.config import KlipperScreenConfig
 from panels.base_panel import BasePanel
 
+import threading
+try:
+    from ks_includes.Encoder import EncoderController
+    ENCODER_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Encoder module not available: {e}")
+    ENCODER_AVAILABLE = False
+except Exception as e:
+    logging.error(f"Error importing encoder module: {e}")
+    ENCODER_AVAILABLE = False
+
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -150,6 +161,8 @@ class KlipperScreen(Gtk.Window):
         logging.info(f"Screen resolution: {self.width}x{self.height}")
         self.theme = self._config.get_main_config().get('theme')
         self.show_cursor = self._config.get_main_config().getboolean("show_cursor", fallback=False)
+        self.encoder_support = self._config.get_main_config().getboolean("encoder_support", fallback=False)
+
         self.setup_gtk_settings()
         self.style_provider = Gtk.CssProvider()
         self.screensaver = ScreenSaver(self)
@@ -164,6 +177,7 @@ class KlipperScreen(Gtk.Window):
         self.overlay.add_overlay(self.base_panel.main_grid)
         self.show_all()
         self.update_cursor(self.show_cursor)
+
         min_ver = (3, 8)
         if sys.version_info < min_ver:
             self.show_error_modal(
@@ -1318,6 +1332,7 @@ class KlipperScreen(Gtk.Window):
             self.vertical_mode = new_mode
             self.aspect_ratio = new_ratio
             logging.info(f"Vertical mode: {self.vertical_mode}")
+
 
 
 def main():
