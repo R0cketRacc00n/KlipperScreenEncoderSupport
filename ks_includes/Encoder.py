@@ -49,7 +49,8 @@ class EncoderHandler:
     с поддержкой различных режимов работы
     """
     
-    def __init__(self, pin_a=22, pin_b=23, pin_button=24, hold_time=3, use_gpio=True):
+    def __init__(self, pin_a=22, pin_b=23, pin_button=24, hold_time=3, 
+                                    use_gpio=True, debounce_delay=0.1):
         """
         Инициализация обработчика энкодера
         
@@ -89,6 +90,11 @@ class EncoderHandler:
         # Инициализация GPIO
         if self.use_gpio:
             self._setup_gpio()
+            
+        # Защита от дребезга
+        self.debounce_delay = debounce_delay
+        self.last_encoder_time = 0
+        self.last_button_time = 0
     
     def _setup_gpio(self):
         """Настройка GPIO"""
@@ -169,6 +175,12 @@ class EncoderHandler:
         """Чтение состояния энкодера"""
         if not self.use_gpio:
             return 0
+        
+        current_time = time.time()
+        
+        # Защита от дребезга - игнорируем слишком частые срабатывания
+        if current_time - self.last_encoder_time < self.debounce_delay:
+            return 0
             
         MSB = GPIO.input(self.pin_a)
         LSB = GPIO.input(self.pin_b)
@@ -178,8 +190,11 @@ class EncoderHandler:
         
         if sum_val == 0b1101 or sum_val == 0b0100 or sum_val == 0b0010 or sum_val == 0b1011:
             self.encoder_value += 1
+            self.last_encoder_time = current_time
         if sum_val == 0b1110 or sum_val == 0b0111 or sum_val == 0b0001 or sum_val == 0b1000:
             self.encoder_value -= 1
+            self.last_encoder_time = current_time
+        
         
         self.last_encoded = encoded
         return self.encoder_value
@@ -238,7 +253,7 @@ class EncoderHandler:
         while self.running:
             self._handle_rotation()
             self._handle_button()
-            time.sleep(0.01)  # 10ms delay
+            time.sleep(0.2)  # 10ms delay
     
     def start(self):
         """Запуск обработчика в отдельном потоке"""

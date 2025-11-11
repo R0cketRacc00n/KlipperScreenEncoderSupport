@@ -36,7 +36,7 @@ from panels.base_panel import BasePanel
 
 import threading
 try:
-    from ks_includes.Encoder import EncoderController
+    from ks_includes.Encoder import EncoderHandler, EncoderMode
     ENCODER_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"Encoder module not available: {e}")
@@ -91,6 +91,8 @@ class KlipperScreen(Gtk.Window):
     prompt = None
     tempstore_timeout = None
     check_dpms_timeout = None
+    encoder_support = False
+    encoder = None
 
     def __init__(self, args):
         self.server_info = None
@@ -162,7 +164,9 @@ class KlipperScreen(Gtk.Window):
         self.theme = self._config.get_main_config().get('theme')
         self.show_cursor = self._config.get_main_config().getboolean("show_cursor", fallback=False)
         self.encoder_support = self._config.get_main_config().getboolean("encoder_support", fallback=False)
-
+        if self.encoder_support and ENCODER_AVAILABLE:
+            self.encoder=self.init_encoder()
+        
         self.setup_gtk_settings()
         self.style_provider = Gtk.CssProvider()
         self.screensaver = ScreenSaver(self)
@@ -197,6 +201,72 @@ class KlipperScreen(Gtk.Window):
         self.lock_screen = LockScreen(self)
         self.log_notification("KlipperScreen Started", 1)
         self.initial_connection()
+        
+    def init_encoder(self):
+        class FocusMode(EncoderMode):
+            def get_name(self):
+                return "FocusMode"
+        
+        class ArrowVMode(EncoderMode):
+            def get_name(self):
+                return "ArrowVMode"
+            
+        def create_key_emulator(wayland):
+            """
+            Упрощенная версия с замыканием
+            Возвращает функцию для эмуляции нажатий клавиш
+            """
+            
+            # Определяем доступный метод
+            if wayland and True: #Вместо True Добавить проверку наличия утилиты
+                method = 'ydotool'
+                tool = 'ydotool'
+            elif not wayland and True: #Вместо True Добавить проверку наличия утилиты
+                method = 'xdotool'
+                tool = 'xdotool'
+            else:
+                method = 'unknown'
+                tool = None
+            
+            def emulate_keys(key_combo):
+                """Эмулирует нажатие клавиш или комбинации"""
+                if tool:
+                    try:
+                        subprocess.run([tool, 'key', key_combo], check=False, 
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        return True
+                    except Exception:
+                        return False
+                return False
+            
+            # Добавляем информацию о методе
+            emulate_keys.method = method
+            emulate_keys.tool = tool
+            
+            return emulate_keys
+        
+        key_press = create_key_emulator(self.wayland)
+                
+        encoder = EncoderHandler(pin_a=22, pin_b=23, pin_button=24, hold_time=3)
+        
+        focusmode = FocusMode()
+        arrowvmode = ArrowVMode()
+        
+        encoder.add_mode(focusmode)
+        encoder.add_mode(arrowvmode)
+        
+        # Установка обработчиков для каждого режима
+        encoder.set_mode_handlers("FocusMode", 
+                                lambda: key_press('Tab'), 
+                                lambda: key_press('shift+Tab'))
+        encoder.set_mode_handlers("ArrowVMode", 
+                                lambda: key_press('Up'), 
+                                lambda: key_press('Down'))
+        encoder.set_button_press_callback(lambda: key_press('Return'))
+        encoder.set_button_hold_callback(lambda: key_press('Escape'))
+        
+        encoder.start()
+        return encoder
 
     def update_cursor(self, show: bool):
         self.show_cursor = show
