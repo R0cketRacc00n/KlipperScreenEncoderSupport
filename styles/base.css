@@ -21,6 +21,10 @@
     border: 0;
 }
 
+combobox window.popup menuitem:hover {
+    background-color: @active;
+}
+
 button.dialog-info:focus,
 button.dialog-warning:focus,
 button.dialog-error:focus,
@@ -35,6 +39,21 @@ button:focus {
     border-color: red;
     border: .15em;
     border-style: solid;
+}
+
+switch:focus {
+	border: .15em;
+	color: yellow;
+    background-color: @active;
+    border-color: yellow;
+    border-style: solid;
+} 
+
+switch:focus slider {
+	background-color: red;
+    border: .4em;
+	border-color: red;
+	border-style: solid;
 }
 
 button:disabled {

@@ -268,6 +268,15 @@ class KlipperScreen(Gtk.Window):
         encoder.start()
         return encoder
 
+    def encoder_arrow_mode(self):
+        self.encoder.set_mode("ArrowVMode")
+        logging.info("ArrowVMode")
+        
+    def encoder_focus_mode(self):
+        self.encoder.set_mode("FocusMode")
+        logging.info("FocusMode")
+        
+        
     def update_cursor(self, show: bool):
         self.show_cursor = show
         self.gtk.set_cursor(show, window=self.get_window())

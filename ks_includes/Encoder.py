@@ -102,6 +102,11 @@ class EncoderHandler:
         GPIO.setup(self.pin_a, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.pin_b, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.pin_button, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        
+        MSB = GPIO.input(self.pin_a)
+        LSB = GPIO.input(self.pin_b)
+        
+        self.encoder_value = (MSB << 1) | LSB
     
     def add_mode(self, mode):
         """
