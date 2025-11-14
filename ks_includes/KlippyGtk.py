@@ -247,6 +247,8 @@ class KlippyGtk:
             content.connect("button-release-event", self.dialog_content_decouple, dialog)
             dialog.add_events(Gdk.EventMask.BUTTON_RELEASE_MASK)
             dialog.connect("button-release-event", self.remove_dialog)
+            if self.encoder_support:
+                dialog.connect('key-press-event', self.remove_dialog)
 
         dialog.connect("response", self.screen.screensaver.reset_timeout)
         dialog.connect("response", callback, *args)

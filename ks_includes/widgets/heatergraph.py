@@ -10,7 +10,7 @@ from cairo import Context as cairoContext
 
 
 class HeaterGraph(Gtk.DrawingArea):
-    def __init__(self, screen, printer, font_size, fullscreen=False, store=None):
+    def __init__(self, screen, printer, font_size, fullscreen=False, store=None, can_focus=True):
         super().__init__()
         self._gtk = screen.gtk
         self.set_hexpand(True)
@@ -34,13 +34,43 @@ class HeaterGraph(Gtk.DrawingArea):
             if "max_temp" in self.printer.get_config_section(section):
                 self.max_temp = max(float(self.printer.get_config_section(section)["max_temp"]), self.max_temp)
         self.max_temp = min(self.max_temp, 999)
+        if self._screen.encoder_support:
+            # Включаем получение фокуса
+            self.set_can_focus(can_focus)
+            self.add_events(Gdk.EventMask.KEY_PRESS_MASK)  # Добавляем обработку клавиатуры
+            # Подключаем обработчики фокуса
+            self.connect('focus-in-event', self.on_focus_in)
+            self.connect('focus-out-event', self.on_focus_out)
+            self.connect('key-press-event', screen.screensaver.reset_timeout)  # Обработка нажатия клавиш
+            self.connect('key-press-event', self.on_key_press)
+            
+    def on_focus_in(self, widget, event):
+        # При получении фокуса перерисовываем виджет
+        self.queue_draw()
+        return False
+
+    def on_focus_out(self, widget, event):
+        # При потере фокуса перерисовываем виджет
+        self.queue_draw()
+        return False
+    
+    def on_key_press(self, widget, event):
+        keyval = event.keyval
+        keyval_name = Gdk.keyval_name(keyval)
+        # Обрабатываем Enter и Return
+        if keyval_name in ('Return', 'KP_Enter'):
+            if not self.fullscreen:
+                self.show_fullscreen_graph()
+                logging.info("Entering Fullscreen")
+            return True
+        return False
 
     def update_graph(self):
         self.queue_draw()
         return self.fullscreen
 
     def show_fullscreen_graph(self):
-        self.fs_graph = HeaterGraph(self._screen, self.printer, self.font_size * 2, fullscreen=True, store=self.store)
+        self.fs_graph = HeaterGraph(self._screen, self.printer, self.font_size * 2, fullscreen=True, store=self.store, can_focus=False)
         self._gtk.Dialog(_("Temperature"), None, self.fs_graph, self.close_fullscreen_graph)
 
     def close_fullscreen_graph(self, dialog, response_id):
@@ -78,10 +108,51 @@ class HeaterGraph(Gtk.DrawingArea):
         return max(mnum)
 
     def draw_graph(self, da: Gtk.DrawingArea, ctx: cairoContext):
+    
+        # Получаем стиль для виджета
+        style_context = self.get_style_context()
+        
+        # Отрисовка фона (если задан в CSS)
+        if self.is_focus():
+            # Получаем цвет фона для состояния фокуса
+            state = Gtk.StateFlags.FOCUSED
+        else:
+            state = Gtk.StateFlags.NORMAL
+        
+        # Отрисовка стандартного фона GTK
+        Gtk.render_background(style_context, ctx, 0, 0, 
+                             da.get_allocated_width(), da.get_allocated_height())
+            
+        if self.is_focus():
+            # Получаем цвет рамки из CSS
+            color = style_context.get_border_color(state)
+            if color.alpha > 0:  # Если цвет задан и не прозрачный
+                # Получаем ширину рамки из CSS
+                border = style_context.get_border(state)
+                border_width = max(border.top, border.right, border.bottom, border.left)
+                
+                if border_width > 0:
+                    ctx.set_source_rgba(color.red, color.green, color.blue, color.alpha)
+                    ctx.set_line_width(border_width)
+                    
+                    # Рисуем рамку
+                    ctx.rectangle(
+                        border_width / 2, 
+                        border_width / 2, 
+                        da.get_allocated_width() - border_width, 
+                        da.get_allocated_height() - border_width
+                    )
+                    ctx.stroke()
+    
         if not self.printer.tempstore:
             logging.info("Tempstore not initialized!")
             self._screen.init_tempstore()
             return
+
+        # Учитываем отступы для рамки при расчете области графика
+        border = style_context.get_border(Gtk.StateFlags.FOCUSED if self.is_focus() else Gtk.StateFlags.NORMAL)
+        border_width = max(border.top, border.right, border.bottom, border.left) 
+
         x = round(self.font_size * 2.75)
         y = 10
         width = da.get_allocated_width() - 15

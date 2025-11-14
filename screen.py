@@ -165,8 +165,14 @@ class KlipperScreen(Gtk.Window):
         self.show_cursor = self._config.get_main_config().getboolean("show_cursor", fallback=False)
         self.encoder_support = self._config.get_main_config().getboolean("encoder_support", fallback=False)
         if self.encoder_support and ENCODER_AVAILABLE:
-            self.encoder=self.init_encoder()
-        
+            pin_a = self._config.get_main_config().getint("encoder_pin_a", None)
+            pin_b = self._config.get_main_config().getint("encoder_pin_b", None)
+            pin_button = self._config.get_main_config().getint("encoder_pin_button", None)
+            hold_time = self._config.get_main_config().getint("encoder_hold_time", None)
+            self.encoder=self.init_encoder(pin_a=pin_a, pin_b=pin_b, pin_button=pin_button, hold_time=hold_time)
+            self.encoder_arrow_mode()
+            self.encoder_focus_mode()
+            
         self.setup_gtk_settings()
         self.style_provider = Gtk.CssProvider()
         self.screensaver = ScreenSaver(self)
@@ -202,7 +208,7 @@ class KlipperScreen(Gtk.Window):
         self.log_notification("KlipperScreen Started", 1)
         self.initial_connection()
         
-    def init_encoder(self):
+    def init_encoder(self, pin_a=22, pin_b=23, pin_button=24, hold_time=3):
         class FocusMode(EncoderMode):
             def get_name(self):
                 return "FocusMode"
@@ -212,11 +218,7 @@ class KlipperScreen(Gtk.Window):
                 return "ArrowVMode"
             
         def create_key_emulator(wayland):
-            """
-            Упрощенная версия с замыканием
-            Возвращает функцию для эмуляции нажатий клавиш
-            """
-            
+            """Возвращает функцию для эмуляции нажатий клавиш"""
             # Определяем доступный метод
             if wayland and True: #Вместо True Добавить проверку наличия утилиты
                 method = 'ydotool'
@@ -227,7 +229,6 @@ class KlipperScreen(Gtk.Window):
             else:
                 method = 'unknown'
                 tool = None
-            
             def emulate_keys(key_combo):
                 """Эмулирует нажатие клавиш или комбинации"""
                 if tool:
@@ -242,39 +243,36 @@ class KlipperScreen(Gtk.Window):
             # Добавляем информацию о методе
             emulate_keys.method = method
             emulate_keys.tool = tool
-            
             return emulate_keys
-        
+            
+        def encoder_arrow_mode(self):
+            self.encoder.set_mode("ArrowVMode")
+            logging.info("Encoder ArrowVMode")
+            return False
+            
+        def encoder_focus_mode(self):
+            self.encoder.set_mode("FocusMode")
+            logging.info("Encoder FocusMode")
+            return False
+            
         key_press = create_key_emulator(self.wayland)
                 
-        encoder = EncoderHandler(pin_a=22, pin_b=23, pin_button=24, hold_time=3)
+        encoder = EncoderHandler(pin_a=pin_a, pin_b=pin_b, pin_button=pin_button, hold_time=hold_time)
         
-        focusmode = FocusMode()
-        arrowvmode = ArrowVMode()
+        focusmode = FocusMode(lambda: key_press('Tab'), lambda: key_press('shift+Tab'))
+        arrowvmode = ArrowVMode(lambda: key_press('Down'), lambda: key_press('Up'))
         
         encoder.add_mode(focusmode)
         encoder.add_mode(arrowvmode)
         
-        # Установка обработчиков для каждого режима
-        encoder.set_mode_handlers("FocusMode", 
-                                lambda: key_press('Tab'), 
-                                lambda: key_press('shift+Tab'))
-        encoder.set_mode_handlers("ArrowVMode", 
-                                lambda: key_press('Up'), 
-                                lambda: key_press('Down'))
         encoder.set_button_press_callback(lambda: key_press('Return'))
         encoder.set_button_hold_callback(lambda: key_press('Escape'))
         
+        KlipperScreen.encoder_arrow_mode = encoder_arrow_mode
+        KlipperScreen.encoder_focus_mode = encoder_focus_mode
+        
         encoder.start()
         return encoder
-
-    def encoder_arrow_mode(self):
-        self.encoder.set_mode("ArrowVMode")
-        logging.info("ArrowVMode")
-        
-    def encoder_focus_mode(self):
-        self.encoder.set_mode("FocusMode")
-        logging.info("FocusMode")
         
         
     def update_cursor(self, show: bool):

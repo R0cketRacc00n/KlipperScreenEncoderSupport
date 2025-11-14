@@ -111,6 +111,9 @@ class ScreenPanel:
             self._config.save_user_config_options()
             if callback is not None:
                 callback(value)
+        if self._screen.encoder_support:
+            self._screen.encoder_focus_mode()
+            return False
 
     def scale_moved(self, widget, event, section, option):
         logging.debug(f"[{section}] {option} changed to {widget.get_value()}")
@@ -243,6 +246,9 @@ class ScreenPanel:
                 dropdown.append(opt['value'], opt['name'])
                 if opt['value'] == self._config.get_config()[option['section']].get(opt_name, option['value']):
                     dropdown.set_active(i)
+            if self._screen.encoder_support:
+                dropdown.connect("popup", lambda x: self._screen.encoder_arrow_mode())
+                dropdown.connect("notify::popup-shown", self._on_dropdown_popup_shown)
             dropdown.connect("changed", self.on_dropdown_change, option['section'], opt_name,
                              option['callback'] if "callback" in option else None)
             dropdown.set_entry_text_column(0)
@@ -289,3 +295,7 @@ class ScreenPanel:
         self.labels[boxname].attach(opt_array[opt_name]['row'], 0, pos, 1, 1)
         self.labels[boxname].show_all()
         return setting
+        
+    def _on_dropdown_popup_shown(self, widget, gparam):
+        if not widget.get_popup_shown():
+            self._screen.encoder_focus_mode()
