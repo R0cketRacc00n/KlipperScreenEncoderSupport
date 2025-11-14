@@ -25,6 +25,10 @@ combobox window.popup menuitem:hover {
     background-color: @active;
 }
 
+.heatergraph:focus {
+    background-color: @active; /* Светло-голубой фон при фокусе */
+    border: 0.15em solid yellow; /* Синяя рамка при фокусе */
+}
 button.dialog-info:focus,
 button.dialog-warning:focus,
 button.dialog-error:focus,
