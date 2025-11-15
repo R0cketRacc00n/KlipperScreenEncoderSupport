@@ -7,6 +7,7 @@ from gi.repository import Gtk, GLib
 from panels.menu import Panel as MenuPanel
 from ks_includes.widgets.heatergraph import HeaterGraph
 from ks_includes.widgets.keypad import Keypad
+from ks_includes.widgets.encnum import Encnum  # Добавляем импорт Encnum
 from ks_includes.KlippyGtk import find_widget
 
 
@@ -285,8 +286,13 @@ class Panel(MenuPanel):
         self.active_heater = device
         self.devices[self.active_heater]['name'].get_style_context().add_class("button_active")
 
+        # Используем Encnum вместо Keypad если включена поддержка энкодера
         if "keypad" not in self.labels:
-            self.labels["keypad"] = Keypad(self._screen, self.change_target_temp, self.pid_calibrate, self.hide_numpad)
+            if self._screen.encoder_support:
+                self.labels["keypad"] = Encnum(self._screen, self.change_target_temp, self.pid_calibrate, self.hide_numpad)
+            else:
+                self.labels["keypad"] = Keypad(self._screen, self.change_target_temp, self.pid_calibrate, self.hide_numpad)
+        
         can_pid = self._printer.state not in ("printing", "paused") \
             and self._screen.printer.config[self.active_heater]['control'] == 'pid'
         self.labels["keypad"].show_pid(can_pid)

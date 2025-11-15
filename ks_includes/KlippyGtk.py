@@ -43,6 +43,9 @@ class KlippyGtk:
         self.ultra_tall = (self.height / self.width) >= 3
         self.font_ratio = [28, 42] if self.screen.vertical_mode else [40, 27]
         self.font_size = min(self.width / self.font_ratio[0], self.height / self.font_ratio[1])
+        self.font_size = 9 if self.font_size < 9 else self.font_size #The minimum font size is 9. 
+                                                #On a 320x240 screen, anything larger than 9 shifts everything; 
+                                                #text smaller than that is unreadable.
         self.img_scale = self.font_size * 2
         self.button_image_scale = 1.38
         self.bsidescale = .65  # Buttons with image at the side
