@@ -222,25 +222,15 @@ class Panel(MenuPanel):
             )
 
     def create_left_panel(self):
-
-        self.labels['devices'] = Gtk.Grid(vexpand=False)
-        self.labels['devices'].get_style_context().add_class('heater-grid')
-
-        name = Gtk.Label()
-        temp = Gtk.Label(label=_("Temp (°C)"))
-
-        self.labels['devices'].attach(name, 0, 0, 1, 1)
-        self.labels['devices'].attach(temp, 1, 0, 1, 1)
+        builder = self.load_ui("left_panel")
+        self.labels['devices'] = builder.get_object('devices')
+        self.left_panel = builder.get_object('left_panel')
+        
+        temp_label = builder.get_object('temp_label')
+        if temp_label:
+            temp_label.set_label(_(temp_label.get_label()))
 
         self.labels['da'] = HeaterGraph(self._screen, self._printer, self._gtk.font_size)
-
-        scroll = self._gtk.ScrolledWindow(steppers=False)
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroll.get_style_context().add_class('heater-list')
-        scroll.add(self.labels['devices'])
-
-        self.left_panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.left_panel.add(scroll)
 
         for d in self._printer.get_temp_devices():
             self.add_device(d)

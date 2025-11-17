@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <object class="GtkBox" id="left_panel">
+    <property name="orientation">vertical</property>
+    <child>
+      <object class="GtkScrolledWindow" id="scroll">
+        <property name="hexpand">True</property>
+        <property name="vexpand">True</property>
+        <property name="hscrollbar-policy">never</property>
+        <property name="vscrollbar-policy">automatic</property>
+        <style>
+          <class name="heater-list"/>
+        </style>
+        <child>
+          <object class="GtkGrid" id="devices">
+            <property name="vexpand">False</property>
+            <style>
+              <class name="heater-grid"/>
+            </style>
+            <child>
+              <object class="GtkLabel" id="temp_label">
+                <property name="label">Temp (°C)</property>
+                <property name="halign">start</property>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">0</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>
