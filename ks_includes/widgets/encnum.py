@@ -25,10 +25,14 @@ class Encnum(Gtk.Box):
             self.labels['entry'].connect("popdown", lambda x: self.screen.encoder_focus_mode())
                 
         # Создаем кнопки
-        self.labels['Ok'] = self._gtk.Button('complete', _('OK'), style="color1")
-        self.labels['cancel'] = self._gtk.Button('cancel', _('Cancel'), style="color2")
-        self.labels['calibrate'] = self._gtk.Button('heat-up', _('Calibrate'), style="color4")
-        self.labels['cooldown'] = self._gtk.Button('cool-down', _('Cooldown'), style="color3")
+        if self.screen.vertical_mode:
+            position = Gtk.PositionType.LEFT
+        else:
+            position = Gtk.PositionType.TOP
+        self.labels['Ok'] = self._gtk.Button('complete', _('OK'), style="color1", position=position)
+        self.labels['cancel'] = self._gtk.Button('cancel', _('Cancel'), style="color2", position=position)
+        self.labels['calibrate'] = self._gtk.Button('heat-up', _('Calibrate'), style="color4", position=position)
+        self.labels['cooldown'] = self._gtk.Button('cool-down', _('Cooldown'), style="color3", position=position)
         self.labels['calibrate'].set_sensitive(False)
         
         # Устанавливаем одинаковую высоту для всех кнопок
