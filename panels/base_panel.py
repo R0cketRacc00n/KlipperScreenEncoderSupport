@@ -63,16 +63,14 @@ class BasePanel(ScreenPanel):
         # Any action bar button should close the keyboard
         for item in self.control:
             self.control[item].connect("clicked", self._screen.remove_keyboard)
+            
+        builder = self.load_ui("base_panel")
 
         # Action bar
-        self.action_bar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        if self._screen.vertical_mode:
-            self.action_bar.set_hexpand(True)
-            self.action_bar.set_vexpand(False)
-        else:
-            self.action_bar.set_hexpand(False)
-            self.action_bar.set_vexpand(True)
+        
+        self.action_bar = builder.get_object("action_bar")
         self.action_bar.get_style_context().add_class('action_bar')
+
         self.action_bar.set_size_request(self._gtk.action_bar_width, self._gtk.action_bar_height)
         self.action_bar.add(self.control['back'])
         self.action_bar.add(self.control['home'])
@@ -82,48 +80,37 @@ class BasePanel(ScreenPanel):
         self.action_bar.add(self.control['shutdown'])
         self.show_printer_select(len(self._config.get_printers()) > 1)
 
+        #Load UI
+        self.control['temp_box'] = builder.get_object("temp_box")
         # Titlebar
 
         # This box will be populated by show_heaters
-        self.control['temp_box'] = Gtk.Box(spacing=10)
 
-        self.titlelbl = Gtk.Label(hexpand=True, halign=Gtk.Align.CENTER, ellipsize=Pango.EllipsizeMode.END)
+        self.titlelbl = builder.get_object("titlelbl")
 
-        self.control['time'] = Gtk.Label(label="00:00 AM")
-        self.control['time_box'] = Gtk.Box(halign=Gtk.Align.END)
+        self.control['time'] = builder.get_object("time")
+        self.control['time_box'] = builder.get_object("time_box")
         self.control['time_box'].pack_end(self.control['time'], True, True, 10)
 
         self.battery_icons = self.load_battery_icons()
-        self.labels['battery'] = Gtk.Label()
+        self.labels['battery'] = builder.get_object("battery")
         self.labels['battery_icon'] = self._gtk.Image()
         self.labels['battery_icon'].set_from_pixbuf(self.battery_icons['unknown'])
-        self.control['battery_box'] = Gtk.Box(halign=Gtk.Align.END)
-        self.control['battery_box'].set_no_show_all(True)
-        self.control['battery_box'].add(self.labels['battery'])
+        self.control['battery_box'] = builder.get_object("battery_box")
         self.control['battery_box'].add(self.labels['battery_icon'])
         for widget in self.control['battery_box']:
             widget.show()
 
-        self.titlebar = Gtk.Box(spacing=5, valign=Gtk.Align.CENTER)
+        self.titlebar = builder.get_object("titlebar")
         self.titlebar.get_style_context().add_class("title_bar")
-        self.titlebar.add(self.control['temp_box'])
-        self.titlebar.add(self.titlelbl)
-        self.titlebar.add(self.control['time_box'])
-        self.titlebar.add(self.control['battery_box'])
         self.set_title(title)
 
         # Main layout
-        self.main_grid = Gtk.Grid()
+        self.main_grid = builder.get_object("main_grid")
 
         if self._screen.vertical_mode:
-            self.main_grid.attach(self.titlebar, 0, 0, 1, 1)
             self.main_grid.attach(self.content, 0, 1, 1, 1)
-            self.main_grid.attach(self.action_bar, 0, 2, 1, 1)
-            self.action_bar.set_orientation(orientation=Gtk.Orientation.HORIZONTAL)
         else:
-            self.main_grid.attach(self.action_bar, 0, 0, 1, 2)
-            self.action_bar.set_orientation(orientation=Gtk.Orientation.VERTICAL)
-            self.main_grid.attach(self.titlebar, 1, 0, 1, 1)
             self.main_grid.attach(self.content, 1, 1, 1, 1)
 
         self.update_time()
