@@ -30,6 +30,12 @@ combobox window.popup menuitem:hover {
     background-color: @active; /* Светло-голубой фон при фокусе */
     border: 0.15em solid yellow; /* Синяя рамка при фокусе */
 }
+
+.spin-entry {
+	padding: 0;
+	margin: 0;
+}
+
 .spin-entry:focus:not(.active),
 button.dialog-info:focus,
 button.dialog-warning:focus,
