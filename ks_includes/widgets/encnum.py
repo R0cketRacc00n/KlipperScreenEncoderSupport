@@ -20,6 +20,8 @@ class Encnum(Gtk.Box):
         self.labels['entry'] = SpinEntry(screen, min_val=0, max_val=300, step=1, initial_value=0)
         self.labels['entry'].connect("changed", self.on_selection_changed)
         self.connect("show", self.on_show)
+        self.connect("parent-set", self.on_parent_set)
+        
         buttons_config = [
             ('Ok', 'complete', _('OK'), 'color3', self.on_ok_clicked, (0, 0)),
             ('cancel', 'cancel', _('Cancel'), 'color2', self.close_function, (1, 0)),
@@ -85,6 +87,13 @@ class Encnum(Gtk.Box):
     def on_show(self, widget):
         # Устанавливаем фокус на поле ввода при показе виджета
         self.labels['entry'].grab_focus()
+
+    def on_parent_set(self, widget, old_parent):
+        if self.get_parent() is not None and not self.is_visible:
+            self.show()
+        elif self.get_parent() is None:
+            # Виджет был удален из интерфейса
+            self.hide()
 
     @staticmethod
     def validate_temp(temp):
