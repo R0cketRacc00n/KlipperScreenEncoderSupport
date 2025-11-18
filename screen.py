@@ -239,7 +239,8 @@ class KlipperScreen(Gtk.Window):
                     except Exception:
                         return False
                 return False
-            
+            subprocess.run([tool, 'mousemove', '0', '0'], check=False, 
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             # Добавляем информацию о методе
             emulate_keys.method = method
             emulate_keys.tool = tool
