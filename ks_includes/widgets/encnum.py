@@ -2,6 +2,8 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
+from gi.repository import Gdk
+from  ks_includes.widgets.spinentry import SpinEntry
 
 class Encnum(Gtk.Box):
     def __init__(self, screen, change_temp, pid_calibrate, close_function):
@@ -15,14 +17,14 @@ class Encnum(Gtk.Box):
         
         # Создаем выпадающий список с числами 0-300
         self.labels = {}
-        self.labels['entry'] = Gtk.ComboBoxText()
-        for i in range(301):
-            self.labels['entry'].append_text(str(i))
-        self.labels['entry'].set_active(0)  # По умолчанию выбран 0
+        self.labels['entry'] = SpinEntry(screen, min_val=0, max_val=300, step=1, initial_value=0)
+        
+        #self.labels['entry'].connect("key-press-event", self.on_entry_key_press)
+        # self.labels['entry'] = Gtk.ComboBoxText()
+        # for i in range(301):
+            # self.labels['entry'].append_text(str(i))
+        # self.labels['entry'].set_active(0)  # По умолчанию выбран 0
         self.labels['entry'].connect("changed", self.on_selection_changed)
-        if self.screen.encoder_support:
-            self.labels['entry'].connect("popup", lambda x: self.screen.encoder_arrow_mode())
-            self.labels['entry'].connect("popdown", lambda x: self.screen.encoder_focus_mode())
                 
         # Создаем кнопки
         if self.screen.vertical_mode:
@@ -37,9 +39,9 @@ class Encnum(Gtk.Box):
         
         # Устанавливаем одинаковую высоту для всех кнопок
         if self.screen.vertical_mode:
-            height = self._gtk.font_size * 4
-        else:
             height = self._gtk.font_size * 5
+        else:
+            height = self._gtk.font_size * 4
         self.labels['entry'].set_size_request(-1, height)
         self.labels['Ok'].set_size_request(-1, height)
         self.labels['cancel'].set_size_request(-1, height)
@@ -75,24 +77,24 @@ class Encnum(Gtk.Box):
 
     def on_selection_changed(self, *args):
         """Обновляет состояние кнопки Calibrate в зависимости от выбранного значения"""
-        self.screen.encoder_focus_mode()
-        new_temp = self.validate_temp(self.labels['entry'].get_active_text())
+        new_temp = self.validate_temp(self.labels['entry'].value)
         self.labels['calibrate'].set_sensitive(new_temp is not None and new_temp > 9)
 
     def on_calibrate_clicked(self, widget):
         """Обработчик нажатия кнопки Calibrate"""
-        temp = self.validate_temp(self.labels['entry'].get_active_text())
+        temp = self.validate_temp(self.labels['entry'].value)
         if temp is not None:
             self.pid_calibrate(temp)
 
     def on_ok_clicked(self, widget):
         """Обработчик нажатия кнопки OK"""
-        temp = self.validate_temp(self.labels['entry'].get_active_text())
+        temp = self.validate_temp(self.labels['entry'].value)
         if temp is not None:
             self.change_temp(temp)
             
     def clear(self):
-        self.labels['entry'].set_active(0)
+        self.labels['entry'].value = 0
+        pass
     
     def on_cooldown_clicked(self, *args):
         self.change_temp(0)

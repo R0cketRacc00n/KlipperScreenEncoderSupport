@@ -21,6 +21,7 @@
     border: 0;
 }
 
+
 combobox window.popup menuitem:hover {
     background-color: @active;
 }
@@ -29,6 +30,7 @@ combobox window.popup menuitem:hover {
     background-color: @active; /* Светло-голубой фон при фокусе */
     border: 0.15em solid yellow; /* Синяя рамка при фокусе */
 }
+.spin-entry:focus:not(.active),
 button.dialog-info:focus,
 button.dialog-warning:focus,
 button.dialog-error:focus,
@@ -43,6 +45,11 @@ button:focus {
     border-color: red;
     border: .15em;
     border-style: solid;
+}
+
+.spin-entry.active:focus {
+	border-color: red;
+	caret-color: transparent ;
 }
 
 switch:focus {
