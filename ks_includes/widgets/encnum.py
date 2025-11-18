@@ -19,11 +19,6 @@ class Encnum(Gtk.Box):
         self.labels = {}
         self.labels['entry'] = SpinEntry(screen, min_val=0, max_val=300, step=1, initial_value=0)
         
-        #self.labels['entry'].connect("key-press-event", self.on_entry_key_press)
-        # self.labels['entry'] = Gtk.ComboBoxText()
-        # for i in range(301):
-            # self.labels['entry'].append_text(str(i))
-        # self.labels['entry'].set_active(0)  # По умолчанию выбран 0
         self.labels['entry'].connect("changed", self.on_selection_changed)
                 
         # Создаем кнопки
@@ -31,10 +26,10 @@ class Encnum(Gtk.Box):
             position = Gtk.PositionType.LEFT
         else:
             position = Gtk.PositionType.TOP
-        self.labels['Ok'] = self._gtk.Button('complete', _('OK'), style="color1", position=position)
+        self.labels['Ok'] = self._gtk.Button('complete', _('OK'), style="color3", position=position)
         self.labels['cancel'] = self._gtk.Button('cancel', _('Cancel'), style="color2", position=position)
-        self.labels['calibrate'] = self._gtk.Button('heat-up', _('Calibrate'), style="color4", position=position)
-        self.labels['cooldown'] = self._gtk.Button('cool-down', _('Cooldown'), style="color3", position=position)
+        self.labels['calibrate'] = self._gtk.Button('heat-up', _('Calibrate'), style="color3", position=position)
+        self.labels['cooldown'] = self._gtk.Button('cool-down', _('Cooldown'), style="color4", position=position)
         self.labels['calibrate'].set_sensitive(False)
         
         # Устанавливаем одинаковую высоту для всех кнопок

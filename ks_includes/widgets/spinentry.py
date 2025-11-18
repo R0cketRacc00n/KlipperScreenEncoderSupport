@@ -13,7 +13,7 @@ class SpinEntry(Gtk.Entry):
         
         # Настраиваем внешний вид и начальное значение
         self.set_text(str(initial_value))
-        self.set_alignment(0.3)  # Выравнивание по центру
+        self.set_alignment(0.5)  # Выравнивание по центру
         self.set_width_chars(3)
         # Подключаем обработчики событий
         self.connect("key-press-event", self.on_key_press)
