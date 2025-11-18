@@ -19,7 +19,7 @@ class Encnum(Gtk.Box):
         # Создаем счетчик
         self.labels['entry'] = SpinEntry(screen, min_val=0, max_val=300, step=1, initial_value=0)
         self.labels['entry'].connect("changed", self.on_selection_changed)
-        
+        self.connect("show", self.on_show)
         buttons_config = [
             ('Ok', 'complete', _('OK'), 'color3', self.on_ok_clicked, (0, 0)),
             ('cancel', 'cancel', _('Cancel'), 'color2', self.close_function, (1, 0)),
@@ -78,9 +78,13 @@ class Encnum(Gtk.Box):
     def clear(self, value=0):
         self.labels['entry'].value = value if value is not None else 0
         self.labels['cooldown'].set_sensitive(value is not None and value > 0 )
-    
+
     def on_cooldown_clicked(self, *args):
         self.change_temp(0)
+
+    def on_show(self, widget):
+        # Устанавливаем фокус на поле ввода при показе виджета
+        self.labels['entry'].grab_focus()
 
     @staticmethod
     def validate_temp(temp):
