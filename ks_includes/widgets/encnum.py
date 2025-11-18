@@ -15,50 +15,37 @@ class Encnum(Gtk.Box):
         self._gtk = screen.gtk
         self.close_function = close_function
         
-        # Создаем выпадающий список с числами 0-300
         self.labels = {}
+        # Создаем счетчик
         self.labels['entry'] = SpinEntry(screen, min_val=0, max_val=300, step=1, initial_value=0)
-        
         self.labels['entry'].connect("changed", self.on_selection_changed)
-                
-        # Создаем кнопки
-        if self.screen.vertical_mode:
-            position = Gtk.PositionType.LEFT
-        else:
-            position = Gtk.PositionType.TOP
-        self.labels['Ok'] = self._gtk.Button('complete', _('OK'), style="color3", position=position)
-        self.labels['cancel'] = self._gtk.Button('cancel', _('Cancel'), style="color2", position=position)
-        self.labels['calibrate'] = self._gtk.Button('heat-up', _('Calibrate'), style="color3", position=position)
-        self.labels['cooldown'] = self._gtk.Button('cool-down', _('Cooldown'), style="color4", position=position)
-        self.labels['calibrate'].set_sensitive(False)
         
-        # Устанавливаем одинаковую высоту для всех кнопок
-        if self.screen.vertical_mode:
-            height = self._gtk.font_size * 5
-        else:
-            height = self._gtk.font_size * 4
-        self.labels['entry'].set_size_request(-1, height)
-        self.labels['Ok'].set_size_request(-1, height)
-        self.labels['cancel'].set_size_request(-1, height)
-        self.labels['calibrate'].set_size_request(-1, height)
-        self.labels['cooldown'].set_size_request(-1, height)
-        
-        # Подключаем обработчики
-        self.labels['Ok'].connect("clicked", self.on_ok_clicked)
-        self.labels['cancel'].connect("clicked", self.close_function)
-        self.labels['calibrate'].connect("clicked", self.on_calibrate_clicked)
-        self.labels['cooldown'].connect("clicked", self.on_cooldown_clicked)
+        buttons_config = [
+            ('Ok', 'complete', _('OK'), 'color3', self.on_ok_clicked, (0, 0)),
+            ('cancel', 'cancel', _('Cancel'), 'color2', self.close_function, (1, 0)),
+            ('cooldown', 'cool-down', _('Cooldown'), 'color4', self.on_cooldown_clicked, (0, 1)),
+            ('calibrate', 'heat-up', _('Calibrate'), 'color3', self.on_calibrate_clicked, (1, 1))
+        ]
         
         # Создаем сетку для кнопок
         btn_grid = Gtk.Grid(row_homogeneous=True, column_homogeneous=True)
         btn_grid.set_direction(Gtk.TextDirection.LTR)
-        btn_grid.get_style_context().add_class('encnum')
+        btn_grid.get_style_context().add_class('encnum')      
         
-        # Добавляем кнопки в сетку
-        btn_grid.attach(self.labels['Ok'], 0, 0, 1, 1)
-        btn_grid.attach(self.labels['cancel'], 1 ,0, 1, 1)
-        btn_grid.attach(self.labels['cooldown'], 0, 1, 1, 1)
-        btn_grid.attach(self.labels['calibrate'], 1, 1, 1, 1)
+        # Создаем кнопки
+        if self.screen.vertical_mode:
+            position = Gtk.PositionType.LEFT
+            height = self._gtk.font_size * 5
+        else:
+            position = Gtk.PositionType.TOP
+            height = self._gtk.font_size * 4
+            
+        for key, icon, label, style, handler, (col, row) in buttons_config:
+            btn = self._gtk.Button(icon, label, style=style, position=position)
+            btn.connect("clicked", handler)
+            btn.set_size_request(-1, height)
+            self.labels[key] = btn
+            btn_grid.attach(btn, col, row, 1, 1)
 
         # Упаковываем элементы интерфейса
         self.add(self.labels['entry'])
@@ -71,9 +58,10 @@ class Encnum(Gtk.Box):
         self.labels['calibrate'].set_visible(can_pid)
 
     def on_selection_changed(self, *args):
-        """Обновляет состояние кнопки Calibrate в зависимости от выбранного значения"""
+        """Обновляет состояние кнопки Calibrate  и Ok в зависимости от выбранного значения"""
         new_temp = self.validate_temp(self.labels['entry'].value)
-        self.labels['calibrate'].set_sensitive(new_temp is not None and new_temp > 50)
+        self.labels['Ok'].set_sensitive(new_temp is not None and new_temp > 0)
+        self.labels['calibrate'].set_sensitive(new_temp is not None and new_temp >= 50)
 
     def on_calibrate_clicked(self, widget):
         """Обработчик нажатия кнопки Calibrate"""
@@ -82,15 +70,14 @@ class Encnum(Gtk.Box):
             self.pid_calibrate(temp)
 
     def on_ok_clicked(self, widget):
-        """Обработчик нажатия кнопки OK"""
+        """Обработчик нажатия кнопки Ok"""
         temp = self.validate_temp(self.labels['entry'].value)
         if temp is not None:
             self.change_temp(temp)
             
     def clear(self, value=0):
-        self.labels['entry'].value = value
-        self.labels['cooldown'].set_sensitive( value > 0 )
-        pass
+        self.labels['entry'].value = value if value is not None else 0
+        self.labels['cooldown'].set_sensitive(value is not None and value > 0 )
     
     def on_cooldown_clicked(self, *args):
         self.change_temp(0)
@@ -99,6 +86,6 @@ class Encnum(Gtk.Box):
     def validate_temp(temp):
         """Проверка корректности температуры"""
         try:
-            return float(temp)
+            return int(temp)
         except ValueError:
             return None
