@@ -286,7 +286,15 @@ class Panel(MenuPanel):
         can_pid = self._printer.state not in ("printing", "paused") \
             and self._screen.printer.config[self.active_heater]['control'] == 'pid'
         self.labels["keypad"].show_pid(can_pid)
-        self.labels["keypad"].clear()
+        if self._screen.encoder_support:
+            current_target = 0
+            if self.devices[device]['can_target']:
+                current_target = self._printer.get_stat(self.active_heater, "target")
+                if current_target is None:
+                    current_target = 0
+            self.labels["keypad"].clear(current_target)
+        else:
+            self.labels["keypad"].clear()
 
         if self._screen.vertical_mode:
             if not self._gtk.ultra_tall:

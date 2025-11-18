@@ -73,7 +73,7 @@ class Encnum(Gtk.Box):
     def on_selection_changed(self, *args):
         """Обновляет состояние кнопки Calibrate в зависимости от выбранного значения"""
         new_temp = self.validate_temp(self.labels['entry'].value)
-        self.labels['calibrate'].set_sensitive(new_temp is not None and new_temp > 9)
+        self.labels['calibrate'].set_sensitive(new_temp is not None and new_temp > 50)
 
     def on_calibrate_clicked(self, widget):
         """Обработчик нажатия кнопки Calibrate"""
@@ -87,8 +87,9 @@ class Encnum(Gtk.Box):
         if temp is not None:
             self.change_temp(temp)
             
-    def clear(self):
-        self.labels['entry'].value = 0
+    def clear(self, value=0):
+        self.labels['entry'].value = value
+        self.labels['cooldown'].set_sensitive( value > 0 )
         pass
     
     def on_cooldown_clicked(self, *args):
