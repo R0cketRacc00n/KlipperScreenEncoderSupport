@@ -7,7 +7,8 @@ class EncComboBoxText(Gtk.ComboBoxText):
     def __init__(self, screen):
         super().__init__()
         self.screen = screen
-        self.connect("notify::popup-shown", self._on_popup_shown_changed)   
+        # Самый надёжный способ отследить открытие/закрытие — сигнал
+        self.connect("notify::popup-shown", self._on_popup_shown_changed)
         
     def _on_popup_shown_changed(self, widget, gparam):
         # Это срабатывает ВСЕГДА: при popup(), popdown(), Esc, клик вне, выбор и т.д.
@@ -17,3 +18,4 @@ class EncComboBoxText(Gtk.ComboBoxText):
         else:
             self.get_style_context().remove_class('active')
             self.screen.encoder_focus_mode()  # обычный режим
+
