@@ -34,7 +34,7 @@ class ScreenPanel:
         self.content.get_style_context().add_class("content")
         self._show_heater_power = self._config.get_main_config().getboolean('show_heater_power', False)
         self.bts = self._gtk.bsidescale
-
+        self.interface = None
         self.update_dialog = None
         
     def load_ui(self, file):
@@ -73,6 +73,7 @@ class ScreenPanel:
         if not ui_loaded:
             raise Exception(f"No valid UI file found for devices panel")
             
+        self.interface = builder
         return builder
 
     def _autoscroll(self, scroll, *args):

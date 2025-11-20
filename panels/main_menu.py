@@ -19,8 +19,9 @@ class Panel(MenuPanel):
         self.graph_update = None
         self.active_heater = None
         self.h = self.f = 0
-        self.main_menu = Gtk.Grid(row_homogeneous=True, column_homogeneous=True, hexpand=True, vexpand=True)
-        scroll = self._gtk.ScrolledWindow()
+        self.load_ui("main_menu")
+        scroll = self.interface.get_object('scroll_main')
+        self.main_menu = self.interface.get_object('main_menu')
         self.numpad_visible = False
 
         logging.info("### Making MainMenu")
@@ -28,16 +29,9 @@ class Panel(MenuPanel):
         stats = self._printer.get_printer_status_data()["printer"]
         if stats["temperature_devices"]["count"] > 0 or stats["extruders"]["count"] > 0:
             self._gtk.reset_temp_color()
-        if self._screen.vertical_mode:
-            self.main_menu.attach(self.create_left_panel(), 0, 0, 1, 3)
-            self.labels['menu'] = self.arrangeMenuItems(items, 3, True)
-            scroll.add(self.labels['menu'])
-            self.main_menu.attach(scroll, 0, 3, 1, 2)
-        else:
-            self.main_menu.attach(self.create_left_panel(), 0, 0, 1, 1)
-            self.labels['menu'] = self.arrangeMenuItems(items, 2, True)
-            scroll.add(self.labels['menu'])
-            self.main_menu.attach(scroll, 1, 0, 1, 1)
+        self.create_left_panel()
+        self.labels['menu'] = self.arrangeMenuItems(items, 3 if self._screen.vertical_mode else 2, True)
+        scroll.add(self.labels['menu'])
         self.content.add(self.main_menu)
 
     def update_graph_visibility(self, force_hide=False):
@@ -224,11 +218,11 @@ class Panel(MenuPanel):
             )
 
     def create_left_panel(self):
-        builder = self.load_ui("left_panel")
-        self.labels['devices'] = builder.get_object('devices')
-        self.left_panel = builder.get_object('left_panel')
         
-        temp_label = builder.get_object('temp_label')
+        self.labels['devices'] = self.interface.get_object('devices')
+        self.left_panel = self.interface.get_object('left_panel')
+        
+        temp_label = self.interface.get_object('temp_label')
         if temp_label:
             temp_label.set_label(_(temp_label.get_label()))
 
@@ -237,7 +231,7 @@ class Panel(MenuPanel):
         for d in self._printer.get_temp_devices():
             self.add_device(d)
 
-        return self.left_panel
+        #return self.left_panel
 
     def hide_numpad(self, widget=None):
         self.devices[self.active_heater]['name'].get_style_context().remove_class("button_active")
