@@ -8,6 +8,8 @@ from contextlib import suppress
 from ks_includes.screen_panel import ScreenPanel
 from ks_includes.widgets.heatergraph import HeaterGraph
 from ks_includes.widgets.keypad import Keypad
+from ks_includes.widgets.encnum import Encnum  # Добавляем импорт Encnum
+                                                                                       
 from ks_includes.KlippyGtk import find_widget
 
 
@@ -18,6 +20,7 @@ class Panel(ScreenPanel):
     def __init__(self, screen, title, **kwargs):
         title = title or _("Temperature")
         super().__init__(screen, title)
+        self.load_ui("temperature")
         self.left_panel = None
         self.devices = {}
         self.popover = Gtk.Popover(position=Gtk.PositionType.BOTTOM)
@@ -29,16 +32,17 @@ class Panel(ScreenPanel):
         self.tempdelta = self.tempdeltas[-2]
         self.show_preheat = self._printer.state not in ("printing", "paused")
         self.preheat_options = self._screen._config.get_preheat_options()
-        self.grid = Gtk.Grid(row_homogeneous=True, column_homogeneous=True)
+        self.grid = self.interface.get_object('temperature')
         self._gtk.reset_temp_color()
         self.extra_selection = None
         self.numpad_visible = False
-
+        
+        self.create_left_panel()
         if self._screen.vertical_mode:
-            self.grid.attach(self.create_left_panel(), 0, 0, 1, 3)
+            self.grid.remove(row)
             self.grid.attach(self.create_right_panel(), 0, 3, 1, 2)
         else:
-            self.grid.attach(self.create_left_panel(), 0, 0, 1, 1)
+            self.grid.remove_column(1)
             self.grid.attach(self.create_right_panel(), 1, 0, 1, 1)
 
         self.content.add(self.grid)
@@ -407,13 +411,18 @@ class Panel(ScreenPanel):
         if self._show_heater_power and self._printer.device_has_power(device):
             self.labels["da"].add_object(device, "powers", rgb, True, False)
         self.labels["da"].set_showing(device, visible)
-
+                    
         self.devices[device] = {
             "class": class_name,
             "name_button": name,
             "temp": temp,
             "visible": visible,
         }
+        if self._screen.encoder_support:
+            can_target = self._printer.device_has_target(device)
+            if not can_target:
+                temp.props.can_focus =False
+            self.devices[device]["can_target"] = can_target
 
         devices = sorted(self.devices)
         pos = devices.index(device) + 1
@@ -515,27 +524,16 @@ class Panel(ScreenPanel):
             )
 
     def create_left_panel(self):
-
-        self.labels["devices"] = Gtk.Grid(vexpand=False)
-        self.labels["devices"].get_style_context().add_class("heater-grid")
-
-        name = Gtk.Label()
-        temp = Gtk.Label(_("Temp (°C)"))
-
-        self.labels["devices"].attach(name, 0, 0, 1, 1)
-        self.labels["devices"].attach(temp, 1, 0, 1, 1)
+        self.labels['devices'] = self.interface.get_object('devices')
+        self.left_panel = self.interface.get_object('left_panel')
+        
+        temp_label = self.interface.get_object('temp_label')
+        if temp_label:
+            temp_label.set_label(_(temp_label.get_label()))
 
         self.labels["da"] = HeaterGraph(
             self._screen, self._printer, self._gtk.font_size
         )
-
-        scroll = self._gtk.ScrolledWindow(steppers=False)
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroll.get_style_context().add_class("heater-list")
-        scroll.add(self.labels["devices"])
-
-        self.left_panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.left_panel.add(scroll)
 
         self.popover_buttons = {
             "set_temp": self._gtk.Button(label=_("Set Temp")),
@@ -553,8 +551,6 @@ class Panel(ScreenPanel):
 
         for d in self._printer.get_temp_devices():
             self.add_device(d)
-
-        return self.left_panel
 
     def hide_numpad(self, widget=None):
         self.devices[self.active_heater][
@@ -623,19 +619,27 @@ class Panel(ScreenPanel):
             "button_active"
         )
 
+        # Используем Encnum вместо Keypad если включена поддержка энкодера
         if "keypad" not in self.labels:
-            self.labels["keypad"] = Keypad(
-                self._screen,
-                self.change_target_temp,
-                self.pid_calibrate,
-                self.hide_numpad,
-            )
+            if self._screen.encoder_support:
+                self.labels["keypad"] = Encnum(self._screen, self.change_target_temp, self.pid_calibrate, self.hide_numpad)
+            else:
+                self.labels["keypad"] = Keypad(self._screen, self.change_target_temp, self.pid_calibrate, self.hide_numpad)
+
         can_pid = (
             self._printer.state not in ("printing", "paused")
             and self._screen.printer.config[self.active_heater]["control"] == "pid"
         )
         self.labels["keypad"].show_pid(can_pid)
-        self.labels["keypad"].clear()
+        if self._screen.encoder_support:
+            current_target = 0
+            if self.devices[device]['can_target']:
+                current_target = self._printer.get_stat(self.active_heater, "target")
+                if current_target is None:
+                    current_target = 0
+            self.labels["keypad"].clear(current_target)
+        else:
+            self.labels["keypad"].clear()
 
         if self._screen.vertical_mode:
             if not self._gtk.ultra_tall:
