@@ -47,7 +47,7 @@
         <property name="height">3</property>
       </packing>
     </child>
-    <child>
+    <!-- <child>
       <object class="GtkGrid" id="right">
         <property name="row-homogeneous">True</property>
         <property name="column-homogeneous">True</property>
@@ -60,6 +60,15 @@
         <property name="width">1</property>
         <property name="height">2</property>
       </packing>
+    </child> -->
+  </object>
+  <object class="GtkPopover" id="popover">
+	<property name="position">bottom</property>
+    <child>
+      <object class="GtkBox" id="pobox">
+        <property name="orientation">vertical</property>
+      </object>
     </child>
+    <signal name="closed" handler="popover_closed" swapped="no"/>
   </object>
 </interface>

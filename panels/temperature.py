@@ -39,10 +39,8 @@ class Panel(ScreenPanel):
         
         self.create_left_panel()
         if self._screen.vertical_mode:
-            self.grid.remove(row)
             self.grid.attach(self.create_right_panel(), 0, 3, 1, 2)
         else:
-            self.grid.remove_column(1)
             self.grid.attach(self.create_right_panel(), 1, 0, 1, 1)
 
         self.content.add(self.grid)
@@ -57,7 +55,7 @@ class Panel(ScreenPanel):
         cooldown.connect("clicked", self.set_temperature, "cooldown")
         adjust.connect("clicked", self.switch_preheat_adjust)
 
-        right = Gtk.Grid(row_homogeneous=True, column_homogeneous=True)
+        right = Gtk.Grid(row_homogeneous=False, column_homogeneous=True)
         right.attach(cooldown, 0, 0, 2, 1)
         right.attach(adjust, 2, 0, 1, 1)
         if self.show_preheat:
@@ -398,7 +396,12 @@ class Panel(ScreenPanel):
         if self._printer.device_has_target(device):
             temp.connect("clicked", self.show_numpad, device)
             self.labels["da"].add_object(device, "targets", rgb, False, True)
-            name.connect("button-press-event", self.name_pressed, device)
+            
+            if self.encoder_support:
+                name.connect("clicked", self.name_key_pressed, device)
+            else:
+                name.connect("button-press-even", self.name_pressed, device)
+                
             self.long_press[device] = Gtk.GestureLongPress.new(name)
             self.long_press[device].connect(
                 "pressed", self.name_long_press, name, device
@@ -408,21 +411,18 @@ class Panel(ScreenPanel):
             )
         else:
             name.connect("clicked", self.toggle_visibility, device)
+            temp.props.can_focus = False
         if self._show_heater_power and self._printer.device_has_power(device):
             self.labels["da"].add_object(device, "powers", rgb, True, False)
         self.labels["da"].set_showing(device, visible)
-                    
+                
         self.devices[device] = {
             "class": class_name,
             "name_button": name,
             "temp": temp,
             "visible": visible,
         }
-        if self._screen.encoder_support:
-            can_target = self._printer.device_has_target(device)
-            if not can_target:
-                temp.props.can_focus =False
-            self.devices[device]["can_target"] = can_target
+        
 
         devices = sorted(self.devices)
         pos = devices.index(device) + 1
@@ -432,6 +432,30 @@ class Panel(ScreenPanel):
         self.labels["devices"].attach(temp, 1, pos, 1, 1)
         self.labels["devices"].show_all()
         return True
+    
+    def popover_select_toggled(self, button):
+        if self.popover_device is None:
+            return
+            
+        if button.get_active():
+            # Добавляем в выделенные, если еще нет
+            if self.popover_device not in self.active_heaters:
+                self.active_heaters.append(self.popover_device)
+                self.devices[self.popover_device]["name_button"].get_style_context().add_class("button_active")
+        else:
+            # Убираем из выделенных
+            if self.popover_device in self.active_heaters:
+                self.active_heaters.remove(self.popover_device)
+                self.devices[self.popover_device]["name_button"].get_style_context().remove_class("button_active")
+        self.popover.popdown()
+
+    def name_key_pressed(self, widget, device):
+        self.popover_device = device
+        self.popover_popup(widget, device)
+        # self.popover.set_relative_to(widget)
+        # self.popover_populate_menu()
+        # self.popover.show_all()
+        return True  # Событие обработано
 
     def name_pressed(self, widget, event, device):
         self.popover_device = device
@@ -543,10 +567,28 @@ class Panel(ScreenPanel):
         self.popover_buttons["set_temp"].set_no_show_all(True)
         self.popover_buttons["graph_show"].connect("clicked", self.toggle_visibility)
 
-        pobox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        pobox.pack_start(self.popover_buttons["graph_show"], True, True, 5)
-        pobox.pack_start(self.popover_buttons["set_temp"], True, True, 5)
+        pobox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, homogeneous=False)
         self.popover.add(pobox)
+        pobox.set_halign(Gtk.Align.CENTER)
+        pobox.set_valign(Gtk.Align.CENTER)
+        if self.encoder_support:
+            self.popover_buttons["back"] = self._gtk.Button(label=_("Back"))
+            self.popover_buttons["back"].connect("clicked", lambda widget: self.popover.popdown())
+            self.popover_buttons["selected"] = Gtk.CheckButton(
+                label=_("Selected"), can_focus=True
+            )
+            self.popover_buttons["selected"].set_alignment(0.4, 0.5) 
+            self.popover_buttons["selected"].connect("toggled", self.popover_select_toggled)
+            pobox.pack_start(self.popover_buttons["back"], False, False, 5)
+            pobox.pack_start(self.popover_buttons["selected"], False, False, 5)
+            pobox.pack_start(self.popover_buttons["graph_show"], False, False, 5)
+            pobox.pack_start(self.popover_buttons["set_temp"], False, False, 5)
+            for button in self.popover_buttons.values():
+                button.get_style_context().add_class('encmode') 
+        else:
+            pobox.pack_start(self.popover_buttons["graph_show"], True, True, 5)
+            pobox.pack_start(self.popover_buttons["set_temp"], True, True, 5)
+        
         self.popover.connect("closed", self.popover_closed)
 
         for d in self._printer.get_temp_devices():
@@ -596,6 +638,11 @@ class Panel(ScreenPanel):
             self.popover_buttons["set_temp"].show()
         else:
             self.popover_buttons["set_temp"].hide()
+            
+        if self.encoder_support:
+            self.popover_buttons["selected"].set_active(
+                self.popover_device in self.active_heaters
+            )
 
     def process_update(self, action, data):
         if action != "notify_status_update":
@@ -621,7 +668,7 @@ class Panel(ScreenPanel):
 
         # Используем Encnum вместо Keypad если включена поддержка энкодера
         if "keypad" not in self.labels:
-            if self._screen.encoder_support:
+            if self.encoder_support:
                 self.labels["keypad"] = Encnum(self._screen, self.change_target_temp, self.pid_calibrate, self.hide_numpad)
             else:
                 self.labels["keypad"] = Keypad(self._screen, self.change_target_temp, self.pid_calibrate, self.hide_numpad)
@@ -631,9 +678,9 @@ class Panel(ScreenPanel):
             and self._screen.printer.config[self.active_heater]["control"] == "pid"
         )
         self.labels["keypad"].show_pid(can_pid)
-        if self._screen.encoder_support:
+        if self.encoder_support:
             current_target = 0
-            if self.devices[device]['can_target']:
+            if self._printer.device_has_target(device):
                 current_target = self._printer.get_stat(self.active_heater, "target")
                 if current_target is None:
                     current_target = 0

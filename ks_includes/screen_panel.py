@@ -25,6 +25,7 @@ class ScreenPanel:
         ScreenPanel._files = screen.files
         ScreenPanel._printer = screen.printer
         ScreenPanel._gtk = screen.gtk
+        ScreenPanel.encoder_support = screen.encoder_support
         self.labels = {}
         self.control = {}
         self.title = title

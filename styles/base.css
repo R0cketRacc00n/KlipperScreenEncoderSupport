@@ -20,7 +20,10 @@
     box-shadow: none;
     border: 0;
 }
-
+popover box .encmode {
+	padding: 0px 5px;
+    margin: 0px 5px;
+}
 
 combobox window.popup menuitem:hover {
     background-color: @active;
@@ -35,7 +38,11 @@ combobox window.popup menuitem:hover {
 	padding: 0;
 	margin: 0;
 }
-
+popover checkbutton {
+    padding: 8px;
+    margin: 2px;
+}
+popover checkbutton:focus,
 .spin-entry:focus:not(.active),
 button.dialog-info:focus,
 button.dialog-warning:focus,
