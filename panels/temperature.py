@@ -447,7 +447,6 @@ class Panel(ScreenPanel):
             if self.popover_device in self.active_heaters:
                 self.active_heaters.remove(self.popover_device)
                 self.devices[self.popover_device]["name_button"].get_style_context().remove_class("button_active")
-        self.popover.popdown()
 
     def name_key_pressed(self, widget, device):
         self.popover_device = device
