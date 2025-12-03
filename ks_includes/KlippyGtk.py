@@ -36,15 +36,18 @@ class KlippyGtk:
 
     def __init__(self, screen):
         self.screen = screen
+        self.encoder_support = screen.encoder_support
         self.themedir = os.path.join(pathlib.Path(__file__).parent.resolve().parent, "styles", screen.theme, "images")
         self.font_size_type = screen._config.get_main_config().get("font_size", "medium")
         self.width = screen.width
         self.height = screen.height
         self.ultra_tall = (self.height / self.width) >= 3
         self.font_ratio = [28, 42] if self.screen.vertical_mode else [40, 27]
-        self.font_size = min(self.width / self.font_ratio[0], self.height / self.font_ratio[1])
-        self.img_scale = self.font_size * 2
-        self.button_image_scale = 1.38
+        if self.encoder_support:
+            self.font_size = min(self.width / self.font_ratio[0], self.height / self.font_ratio[1])
+            self.font_size = max(8.6, self.font_size) if self.screen.vertical_mode else max(9, self.font_size)
+        self.img_scale = self.font_size * 2 
+        self.button_image_scale = 1.3 if self.encoder_support else 1.38
         self.bsidescale = .65  # Buttons with image at the side
         self.dialog_buttons_height = round(self.height / 5)
 
