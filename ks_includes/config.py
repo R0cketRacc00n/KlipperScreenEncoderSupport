@@ -162,7 +162,7 @@ class KlipperScreenConfig:
                 bools = (
                     'invert_x', 'invert_y', 'invert_z', '24htime', 'only_heaters', 'show_cursor', 'confirm_estop',
                     'autoclose_popups', 'use_dpms', 'use_default_menu', 'side_macro_shortcut', 'use-matchbox-keyboard',
-                    'show_heater_power', "show_scroll_steppers", "auto_open_extrude"
+                    'show_heater_power', "show_scroll_steppers", "auto_open_extrude", "encoder_support"
                 )
                 strs = (
                     'default_printer', 'language', 'print_sort_dir', 'theme', 'screen_blanking_printing', 'font_size',
@@ -171,7 +171,8 @@ class KlipperScreenConfig:
                 )
                 numbers = (
                     'job_complete_timeout', 'job_error_timeout', 'move_speed_xy', 'move_speed_z',
-                    'print_estimate_compensation', 'width', 'height',
+                    'print_estimate_compensation', 'width', 'height', 
+                    'encoder_pin_a', 'encoder_pin_b', 'encoder_pin_button', 'encoder_hold_time',
                 )
             elif section.startswith('printer '):
                 bools = (
