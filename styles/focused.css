@@ -1,0 +1,87 @@
+@define-color color1 #ED6500;
+@define-color color2 #B10080;
+@define-color color3 #009384;
+@define-color color4 #A7E100;
+@define-color bg #13181C;
+@define-color active #404E57;
+@define-color echo #367554;
+@define-color warning #f9a825;
+@define-color error #981E1F;
+@define-color text white;
+@define-color text-inv black;
+@define-color lines #cccccc;
+@define-color switch-scale-bg #3584e4;
+
+popover box .encmode {
+	padding: 0px 5px;
+    margin: 0px 5px;
+}
+
+combobox window.popup menuitem:hover {
+    background-color: @active;
+}
+
+.heatergraph:focus {
+    background-color: @active;
+    border: 0.15em solid yellow;
+}
+
+.spin-entry {
+	padding: 0;
+	margin: 0;
+}
+popover checkbutton {
+    padding: 8px;
+    margin: 2px;
+}
+scrolledwindow:focus:not(.active),
+scale:focus:not(.active),
+popover checkbutton:focus,
+.spin-entry:focus:not(.active),
+button.dialog-info:focus,
+button.dialog-warning:focus,
+button.dialog-error:focus,
+button.dialog-primary:focus,
+button.color1:focus,
+button.color2:focus,
+button.color3:focus,
+button.color4:focus,
+button:focus {
+    color: yellow;
+    background-color: @active;
+    border: .15em;
+    border-style: solid;
+}
+
+scrolledwindow.active,
+.spin-entry.active:focus,
+scale.active:focus {
+	color: red;
+	border-color: red;
+	caret-color: transparent ;
+	border: .15em;
+    border-style: solid;
+}
+box:focus{
+	border-color: blue;
+	border: .15em solid blue;
+	color: @active;
+}
+switch:focus {
+	border: .15em;
+	color: yellow;
+    background-color: @active;
+    border-color: yellow;
+    border-style: solid;
+} 
+
+switch:focus slider {
+	background-color: red;
+    border: .4em;
+	border-color: red;
+	border-style: solid;
+}
+    
+ .heater-grid button{
+    min-height: 0.5em;
+ }
