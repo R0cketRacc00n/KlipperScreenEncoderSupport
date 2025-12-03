@@ -179,6 +179,9 @@ class KlipperScreen(Gtk.Window):
         self.gtk = KlippyGtk(self)
         self.base_css = ""
         self.load_base_styles()
+        self.focused_css = ""
+        if self.encoder_support:
+            self.load_focused_styles()
         self.set_icon_from_file(os.path.join(klipperscreendir, "styles", "icon.svg"))
         self.base_panel = BasePanel(self)
         self.change_theme(self.theme)
@@ -207,6 +210,28 @@ class KlipperScreen(Gtk.Window):
         self.log_notification("KlipperScreen Started", 1)
         self.initial_connection()
         
+    def load_focused_styles(self):
+        """Загружает focused.css для стилизации фокуса при использовании энкодера"""
+        # Сначала проверяем в теме
+        theme_focused_path = os.path.join(klipperscreendir, "styles", self.theme, "focused.css")
+        base_focused_path = os.path.join(klipperscreendir, "styles", "focused.css")
+        
+        if os.path.exists(theme_focused_path):
+            focused_path = theme_focused_path
+        else:
+            focused_path = base_focused_path
+            
+        if os.path.exists(focused_path):
+            try:
+                self.focused_css = pathlib.Path(focused_path).read_text()
+                logging.info(f"Loaded focused.css from {focused_path}")
+            except Exception as e:
+                logging.error(f"Failed to load focused.css: {e}")
+                self.focused_css = ""
+        else:
+            logging.warning("focused.css not found")
+            self.focused_css = ""
+
     def init_encoder(self, pin_a=22, pin_b=23, pin_button=24, hold_time=3):
         class FocusMode(EncoderMode):
             def get_name(self):
@@ -652,6 +677,8 @@ class KlipperScreen(Gtk.Window):
     def update_style_provider(self, theme_css):
         css_data = self.customize_graph_colors(theme_css)
         css_data = self.base_css + css_data
+        if self.encoder_support and hasattr(self, 'focused_css') and self.focused_css:
+            css_data += self.focused_css
         screen = Gdk.Screen.get_default()
         if self.style_provider:
             Gtk.StyleContext.remove_provider_for_screen(screen, self.style_provider)
@@ -670,6 +697,8 @@ class KlipperScreen(Gtk.Window):
         theme_css, theme_options = self.load_custom_theme(theme_name)
         self.style_options.update(theme_options)
         self.gtk.color_list = self.style_options['graph_colors']
+        if self.encoder_support:
+            self.load_focused_styles()
         self.update_style_provider(theme_css)
         self.reload_icon_theme()
 
