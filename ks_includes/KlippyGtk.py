@@ -169,7 +169,10 @@ class KlippyGtk:
     def Button(self, image_name=None, label=None, style=None, scale=None, position=Gtk.PositionType.TOP, lines=2):
         if self.font_size_type == "max" and label is not None:
             image_name = None
-        b = Gtk.Button(hexpand=True, vexpand=True, can_focus=False, image_position=position, always_show_image=True)
+        if self.encoder_support:
+            b = Gtk.Button(hexpand=True, vexpand=True, can_focus=True, image_position=position, always_show_image=True)
+        else:
+            b = Gtk.Button(hexpand=True, vexpand=True, can_focus=False, image_position=position, always_show_image=True)
         if label is not None:
             b.set_label(label.replace("\n", " "))
         if image_name is not None:
