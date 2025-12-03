@@ -1,12 +1,13 @@
 import datetime
 import logging
+import os
 
 import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Pango
 from ks_includes.KlippyGtk import find_widget
-
+from ks_includes.widgets.widgetsforencoder import EncComboBox, EncComboBoxText, EncScale, set_global_screen
 
 class ScreenPanel:
     _screen = None
@@ -23,6 +24,9 @@ class ScreenPanel:
         ScreenPanel._files = screen.files
         ScreenPanel._printer = screen.printer
         ScreenPanel._gtk = screen.gtk
+        ScreenPanel.encoder_support = screen.encoder_support
+        if self.encoder_support:
+            ScreenPanel.init_widgets_for_encoder(screen)
         self.labels = {}
         self.control = {}
         self.title = title
@@ -34,6 +38,53 @@ class ScreenPanel:
         self.bts = self._gtk.bsidescale
 
         self.update_dialog = None
+        
+    @staticmethod
+    def init_widgets_for_encoder(screen):
+        set_global_screen(screen)
+        Gtk.ComboBox = EncComboBox
+        Gtk.ComboBoxText = EncComboBoxText
+        Gtk.Scale = EncScale
+        
+    
+    def load_ui(self, file):
+        """Загрузка UI из XML файлов"""
+        ui_dir = os.path.join(os.path.dirname(__file__), '../UI')
+        
+        # Проверяем существование директории UI
+        if not os.path.exists(ui_dir):
+            logging.error(f"UI directory not found: {ui_dir}")
+            return self._create_fallback_ui(file)
+        
+        # Определение суффикса в зависимости от ориентации
+        suffix = "_V" if self._screen.vertical_mode else "_H"
+        
+        # Попытка загрузить ориентационный файл, иначе универсальный
+        ui_files = [
+            f"{file}{suffix}.xml",  # Ориентационный
+            f"{file}.xml"           # Универсальный
+        ]
+        
+        builder = Gtk.Builder()
+        ui_loaded = False
+        
+        for ui_file in ui_files:
+            ui_path = os.path.join(ui_dir, ui_file)
+            if os.path.exists(ui_path):
+                logging.info(f"Loading {ui_path}")
+                try:
+                    logging.info(f"Loading {ui_path}")
+                    builder.add_from_file(ui_path)
+                    ui_loaded = True
+                    break
+                except Exception as e:
+                    logging.error(f"Error loading UI file {ui_path}: {e}")
+        
+        if not ui_loaded:
+            raise Exception(f"No valid UI file found for devices panel")
+            
+        self.interface = builder
+        return builder
 
     def _autoscroll(self, scroll, *args):
         adj = scroll.get_vadjustment()
