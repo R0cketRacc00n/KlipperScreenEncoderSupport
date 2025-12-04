@@ -4,9 +4,9 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
 
-class Keypad(Gtk.Box):
+class Keypad(Gtk.Grid):
     def __init__(self, screen, change_temp, pid_calibrate, close_function):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL)
+        super().__init__()
 
         self.labels = {}
         self.change_temp = change_temp
@@ -17,15 +17,13 @@ class Keypad(Gtk.Box):
         self.labels['entry'] = Gtk.Entry(hexpand=True, xalign=0.5, max_length=5)
         self.labels['entry'].connect("activate", self.keypad_clicked, "E")
         self.labels['entry'].connect('changed', self.on_changed)
+        self.labels['entry'].set_width_chars(10)
+        self.labels['entry'].set_has_frame(False)
 
         close = self._gtk.Button('cancel', scale=.66)
         close.set_hexpand(False)
         close.set_vexpand(False)
         close.connect("clicked", close_function)
-
-        self.top_box = Gtk.Box(spacing=5)
-        self.top_box.add(self.labels["entry"])
-        self.top_box.add(close)
 
         numpad = Gtk.Grid(row_homogeneous=True, column_homogeneous=True)
         numpad.set_direction(Gtk.TextDirection.LTR)
@@ -72,13 +70,19 @@ class Keypad(Gtk.Box):
         self.pid.connect("clicked", self.keypad_clicked, "PID")
         self.pid.set_sensitive(False)
         self.pid.set_no_show_all(True)
-
-        self.add(self.top_box)
-        self.add(numpad)
-        self.bottom = Gtk.Box()
-        self.bottom.add(self.pid)
-        self.bottom.add(ok)
-        self.add(self.bottom)
+        
+        if self.screen.vertical_mode:
+            self.attach(self.labels['entry'], 0, 0, 2, 1)
+            self.attach(close, 0, 2, 1, 1)
+            self.attach(numpad, 2, 0, 2, 3)
+            self.attach(self.pid, 0, 2, 2, 1)
+            self.attach(ok, 1, 1, 1, 1)
+        else:
+            self.attach(self.labels['entry'], 0, 0, 2, 1)
+            self.attach(close, 2, 0, 1, 1)
+            self.attach(numpad, 0, 1, 3, 1)
+            self.attach(self.pid, 0, 2, 2, 1)
+            self.attach(ok, 2, 2, 1, 1)
 
         self.labels["keypad"] = numpad
 
