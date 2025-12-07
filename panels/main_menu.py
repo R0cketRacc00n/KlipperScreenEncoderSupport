@@ -233,7 +233,7 @@ class Panel(MenuPanel):
         self.labels['devices'].attach(name, 0, 0, 1, 1)
         self.labels['devices'].attach(temp, 1, 0, 1, 1)
 
-        self.labels['da'] = HeaterGraph(self._screen, self._printer, self._gtk.font_size)
+        self.labels['da'] = HeaterGraph(self._screen, self._printer, self._gtk.font_size, can_focus=self.encoder_support)
 
         scroll = self._gtk.ScrolledWindow(steppers=False)
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
