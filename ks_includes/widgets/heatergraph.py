@@ -10,7 +10,7 @@ from cairo import Context as cairoContext
 
 
 class HeaterGraph(Gtk.DrawingArea):
-    def __init__(self, screen, printer, font_size, fullscreen=False, store=None):
+    def __init__(self, screen, printer, font_size, fullscreen=False, store=None, can_focus=True):
         super().__init__()
         self._gtk = screen.gtk
         self.set_hexpand(True)
@@ -24,6 +24,11 @@ class HeaterGraph(Gtk.DrawingArea):
         self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
         self.connect('button_press_event', screen.screensaver.reset_timeout)
         self.connect('button_press_event', self.event_cb)
+        if can_focus:
+            self.connect('key-press-event', screen.screensaver.reset_timeout)
+            self.connect('key-press-event', self.on_key_press)
+            self.set_can_focus(True)
+            self._has_focus = False
         self.font_size = round(font_size * 0.75)
         self.fullscreen = fullscreen
         if fullscreen:
@@ -34,6 +39,7 @@ class HeaterGraph(Gtk.DrawingArea):
             if "max_temp" in self.printer.get_config_section(section):
                 self.max_temp = max(float(self.printer.get_config_section(section)["max_temp"]), self.max_temp)
         self.max_temp = min(self.max_temp, 999)
+        self.set_can_focus(can_focus)
 
     def update_graph(self):
         self.queue_draw()
@@ -54,6 +60,23 @@ class HeaterGraph(Gtk.DrawingArea):
         else:
             self.show_fullscreen_graph()
             logging.info("Entering Fullscreen")
+
+    def on_key_press(self, widget, event):
+        if event.keyval == Gdk.KEY_Return or event.keyval == Gdk.KEY_KP_Enter:
+            if not self.fullscreen:
+                self.show_fullscreen_graph()
+                logging.info("Entering Fullscreen")
+                return True
+            else:
+                parent = self.get_parent()
+                while parent is not None:
+                    if isinstance(parent, Gtk.Dialog):
+                        parent.response(Gtk.ResponseType.CLOSE)
+                        logging.info("Closing fullscreen dialog")
+                        return True
+                    else:
+                        parent = parent.get_parent()                    
+        return False
 
     def add_object(self, name, ev_type, rgb=None, dashed=False, fill=False):
         rgb = [0, 0, 0] if rgb is None else rgb
@@ -82,6 +105,14 @@ class HeaterGraph(Gtk.DrawingArea):
             logging.info("Tempstore not initialized!")
             self._screen.init_tempstore()
             return
+
+        style_context = self.get_style_context()
+        if not self.fullscreen:
+            Gtk.render_background(style_context, ctx, 0, 0, 
+                            da.get_allocated_width(), da.get_allocated_height())
+            Gtk.render_frame(style_context, ctx, 0, 0, 
+                            da.get_allocated_width(), da.get_allocated_height())
+        
         x = round(self.font_size * 2.75)
         y = 10
         width = da.get_allocated_width() - 15
