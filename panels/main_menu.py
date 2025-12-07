@@ -146,6 +146,8 @@ class Panel(MenuPanel):
         find_widget(temp, Gtk.Label).set_ellipsize(False)
         if can_target:
             temp.connect("clicked", self.show_numpad, device)
+        else:
+            temp.set_can_focus(False)
 
         self.devices[device] = {
             "class": class_name,
