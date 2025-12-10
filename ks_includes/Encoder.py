@@ -1,234 +1,318 @@
+# Copyright (c) 2025 Azat Fayzrakhmanov
+# Author: Azat Fayzrakhmanov <k1b0rg.azat@gmail.com>
+#
+# Encoder handler module for KlipperScreen
+# Supports rotary encoder with button, multiple operating modes,
+# interrupt-based GPIO handling (RPi.GPIO), speed-adaptive rotation,
+# and long/short button press detection.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import threading
+import math
 import time
-#import signal
-#import sys
+import signal
+import sys
+import logging
+logger = logging.getLogger("KlipperScreen.Encoder")
 from abc import ABC, abstractmethod
 
 try:
-    import RPi.GPIO as GPIO
+    import RPi.GPIO as GPIO  # USE rpi-lgpio python package
     GPIO_AVAILABLE = True
 except ImportError:
     GPIO_AVAILABLE = False
-    print("RPi.GPIO not available - using mock mode")
+    logger.error("rpi-lgpio not available")
 
 class EncoderMode(ABC):
-    """Абстрактный базовый класс для режимов энкодера"""
-    
-    def __init__(self, clockwise_handler = None, counterclockwise_handler = None):
+    """Abstract base class for encoder modes"""
+
+    def __init__(self, clockwise_handler=None, counterclockwise_handler=None,
+                 clockwise_boosthandler=None, counterclockwise_boosthandler=None):
         self.clockwise_handler = clockwise_handler
         self.counterclockwise_handler = counterclockwise_handler
-    
+        self.clockwise_boosthandler = clockwise_boosthandler
+        self.counterclockwise_boosthandler = counterclockwise_boosthandler
+
     @abstractmethod
     def get_name(self):
-        """Возвращает имя режима"""
+        """Returns the name of the mode"""
         pass
     
-    def set_clockwise_handler(self, handler):
-        """Установка обработчика для вращения по часовой стрелке"""
-        self.clockwise_handler = handler
-    
-    def set_counterclockwise_handler(self, handler):
-        """Установка обработчика для вращения против часовой стрелки"""
-        self.counterclockwise_handler = handler
-    
-    def handle_clockwise(self):
-        """Обработка вращения по часовой стрелке"""
-        if self.clockwise_handler:
-            self.clockwise_handler()
+    @staticmethod
+    def repeat(func, repeat=1):
+        for i in range(repeat):
+            func()
+
+    def set_clockwise_handler(self, handler, boosthandler=None):
+        """Set handler for clockwise rotation"""
+        self.clockwise_handler = handler  # Fixed: was clockwise_handler
+        self.clockwise_boosthandler = boosthandler
+
+    def set_counterclockwise_handler(self, handler, boosthandler=None):
+        """Set handler for counterclockwise rotation"""
+        self.counterclockwise_handler = handler  # Fixed: was counterclockwise_handler
+        self.counterclockwise_boosthandler = boosthandler
+
+    def handle_clockwise(self, boost=False, repeatcount=1):
+        """Handle clockwise rotation"""
+        if self.clockwise_boosthandler and boost:
+            self.repeat(self.clockwise_boosthandler, repeatcount)
+        elif self.clockwise_handler:
+            self.repeat(self.clockwise_handler, repeatcount)
         return self.get_name() + "_clockwise"
-    
-    def handle_counterclockwise(self):
-        """Обработка вращения против часовой стрелки"""
-        if self.counterclockwise_handler:
-            self.counterclockwise_handler()
+
+    def handle_counterclockwise(self, boost=False, repeatcount=1):
+        """Handle counterclockwise rotation"""
+        if self.counterclockwise_boosthandler and boost:
+            self.repeat(self.counterclockwise_boosthandler, repeatcount)
+        elif self.counterclockwise_handler:
+            self.repeat(self.counterclockwise_handler, repeatcount)
         return self.get_name() + "_counterclockwise"
+
 
 class EncoderHandler:
     """
-    Класс для обработки событий энкодера в отдельном потоке
-    с поддержкой различных режимов работы
+    Class for handling encoder events using interrupts
+    and supporting various operating modes
     """
-    
-    def __init__(self, pin_a, pin_b, pin_button, hold_time=3):
+
+    def __init__(self, pin_a=22, pin_b=23, pin_button=24, hold_time=3):
         """
-        Инициализация обработчика энкодера
-        
+        Initialize the encoder handler
+
         Args:
-            pin_a: Пин канала A энкодера
-            pin_b: Пин канала B энкодера  
-            pin_button: Пин кнопки энкодера
-            hold_time: Время удержания кнопки для длинного нажатия
-            use_gpio: Использовать реальный GPIO (False для тестирования)
+            pin_a: Encoder channel A pin (default 22)
+            pin_b: Encoder channel B pin (default 23)
+            pin_button: Encoder button pin (default 24)
+            hold_time: Button hold duration for long press (seconds)
         """
+
         self.pin_a = pin_a
         self.pin_b = pin_b
         self.pin_button = pin_button
         self.hold_time = hold_time
         self.use_gpio = GPIO_AVAILABLE
-        
-        # Состояние энкодера
+
+        # Encoder state
         self.last_state = 0
         self.encoder_position = 0
-        self.encoder_last_time = time.time()
-        
-        # Состояние кнопки
-        self.last_button_state = 1  # Кнопка не нажата
+        self.encoder_last_time = time.monotonic()
+
+        # Button state
+        self.last_button_state = 1
         self.button_press_time = 0
-        self.button_held = False
-        
-        # Режимы работы
+
+        # Operating modes
         self.modes = {}
         self.current_mode = None
         self.mode_index = 0
-        
-        # Callback функции
+
+        # Callback functions
         self.rotation_callback = None
         self.button_press_callback = None
         self.button_hold_callback = None
         self.mode_change_callback = None
-        
-        # Флаг работы
+
+        # Running flag
         self.running = False
         self.thread = None
-        
-        # Инициализация GPIO
-        if self.use_gpio:
-            self._setup_gpio()
-            
-        self.last_encoder_time = 0
-        self.last_button_time = 0
+        self.stop_event = threading.Event()
 
     def _setup_gpio(self):
-        """Настройка GPIO"""
+        """Configure GPIO pins and interrupts"""
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.pin_a, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.pin_b, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.pin_button, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        
+        logger.info("GPIO setup successful")
+        # Configure encoder interrupts with built-in debouncing
+
+        GPIO.add_event_detect(self.pin_a, GPIO.BOTH, callback=self._handle_encoder, bouncetime=1)
+        logger.info("GPIO setup for pin A successful")
+        GPIO.add_event_detect(self.pin_b, GPIO.BOTH, callback=self._handle_encoder, bouncetime=1)
+        logger.info("GPIO setup for pin B successful")
+        # Configure button interrupt with built-in debouncing
+        GPIO.add_event_detect(self.pin_button, GPIO.BOTH, callback=self._handle_button, bouncetime=5)
         self.last_state = (GPIO.input(self.pin_a) << 1) + GPIO.input(self.pin_b)
 
+        logger.info("GPIO interrupts configured")
+
+    def _cleanup_gpio(self):
+        """Release GPIO pins and reset settings"""
+        # Remove interrupt handlers
+        GPIO.remove_event_detect(self.pin_a)
+        GPIO.remove_event_detect(self.pin_b)
+        GPIO.remove_event_detect(self.pin_button)
+
+        # Set pins to safe state
+        GPIO.setup(self.pin_a, GPIO.IN, pull_up_down=GPIO.PUD_OFF)
+        GPIO.setup(self.pin_b, GPIO.IN, pull_up_down=GPIO.PUD_OFF)
+        GPIO.setup(self.pin_button, GPIO.IN, pull_up_down=GPIO.PUD_OFF)
+        GPIO.cleanup()
+
+        logger.info("GPIO pins released and reset")
+
     def _worker(self):
-        """Рабочий цикл в отдельном потоке"""
-        while self.running:
-            self._handle_encoder()
-            self._handle_button()
-            time.sleep(0.001)  # 10ms delay
-    
+        """Worker loop in a separate thread"""
+        # Initialize GPIO
+        if self.use_gpio:
+            try:
+                self._setup_gpio()
+                logger.info(f"GPIO initialized: A={self.pin_a}, B={self.pin_b}, BTN={self.pin_button}")
+            except Exception as e:
+                logger.error(f"GPIO setup error: {e} \n  A={self.pin_a}, B={self.pin_b}, BTN={self.pin_button}")
+                self.use_gpio = False
+
+        self.stop_event.wait()
+
+        if self.use_gpio:
+            self._cleanup_gpio()
+
     def start(self):
-        """Запуск обработчика в отдельном потоке"""
+        """Start the encoder handler in a separate thread"""
         if self.running:
             return
-            
         self.running = True
+        self.stop_event.clear()
         self.thread = threading.Thread(target=self._worker)
-        self.thread.daemon = True
+        logger.info("Thread created")
+        self.thread.daemon = False
         self.thread.start()
-    
-    def stop(self):
-        """Остановка обработчика"""
-        self.running = False
-        if self.thread:
-            self.thread.join(timeout=1.0)
-        
-        if self.use_gpio:
-            GPIO.cleanup()
+        logger.info("Thread started")
 
-    def _handle_encoder(self):
-        """Обработка вращения энкодера"""
+    def stop(self):
+        """Stop the handler and clean up GPIO"""
+        self.running = False
+        self.stop_event.set()
+        if self.thread:
+            self.thread.join(timeout=0.0)
+
+    def _handle_encoder(self, channel):
+        """Encoder interrupt handler"""
         if not self.running:
-            return      
-        # Читаем текущее состояние пинов
-        state = ( (self.last_state << 2) + (GPIO.input(self.pin_a) << 1) + GPIO.input(self.pin_b) ) & 0b1111
-        
+            return
+        # Read current pin states
+        state = ((self.last_state << 2) + (GPIO.input(self.pin_a) << 1) + GPIO.input(self.pin_b)) & 0b1111
+
         if state in [0b1101, 0b0100, 0b0010, 0b1011]:
             self.encoder_position += 1
         elif state in [0b1110, 0b1000, 0b0001, 0b0111]:
             self.encoder_position -= 1
+
         self.last_state = state
         if abs(self.encoder_position) >= 4:
-            speed = time.time() - self.encoder_last_time
-            if speed >=1/3:
+            speed = max(0.05, min(0.5, time.monotonic() - self.encoder_last_time))
+            if speed <= 0.05:
+                count = 10
+            elif speed >= 0.5:
                 count = 1
-            elif speed >= 1/6:
-                count = 2
-            elif speed >= 1/12:
-                count = 4
             else:
-                count = 8
-            for i in range(count) :
-                if self.encoder_position > 0:
-                    if self.current_mode:
-                        action_result = self.modes[self.current_mode].handle_clockwise()
-                        if self.rotation_callback:
-                            self.rotation_callback(action_result, "clockwise")
-                else:
-                    if self.current_mode:
-                        action_result = self.modes[self.current_mode].handle_counterclockwise()
-                        if self.rotation_callback:
-                            self.rotation_callback(action_result, "counterclockwise")
-            self.encoder_last_time = time.time()
+                p = 1.4
+                A = 2.223
+                B = -0.329
+                count = int(A * ((-math.log(speed)) ** p) + B) 
+
+            if count > 5:
+                boost = True
+                count >>= 1 #divide 2
+            else:
+                boost = False
+
+            if self.encoder_position > 0:
+                """Call handler for clockwise rotation"""
+                if self.current_mode and self.current_mode in self.modes:
+                    action_result = self.modes[self.current_mode].handle_clockwise(boost, count)
+                    if self.rotation_callback:
+                        self.rotation_callback(action_result, "clockwise")
+            else:
+                """Call handler for counterclockwise rotation"""
+                if self.current_mode and self.current_mode in self.modes:
+                    action_result = self.modes[self.current_mode].handle_counterclockwise(boost, count)
+                    if self.rotation_callback:
+                        self.rotation_callback(action_result, "counterclockwise")
+            self.encoder_last_time = time.monotonic()
             self.encoder_position = 0
- 
-    def _handle_button(self):
-        """Обработка нажатия кнопки"""
-        if not self.use_gpio:
+
+    def _handle_button(self, channel):
+        """Button interrupt handler"""
+        if not self.running:
             return
-            
-        current_state = GPIO.input(self.pin_button)
-        
-        # Обнаружение нажатия (переход от 1 к 0)
-        if current_state == 0 and self.last_button_state == 1:
-            self.button_press_time = time.time()
-            self.button_held = False
-        
-        # Обнаружение отпускания (переход от 0 к 1)
-        elif current_state == 1 and self.last_button_state == 0:
-            press_duration = time.time() - self.button_press_time
-            
-            if not self.button_held and self.button_press_callback:
-                # Короткое нажатие
-                self.button_press_callback()
-            elif self.button_held and self.button_hold_callback:
-                # Длинное нажатие уже обработано
-                pass
-        
-        # Проверка длинного нажатия
-        if current_state == 0 and not self.button_held:
-            if time.time() - self.button_press_time >= self.hold_time:
-                self.button_held = True
+
+        current_state = ((self.last_button_state << 1) + GPIO.input(self.pin_button)) & 0b11
+
+        # Handle press (transition 1->0)
+        if current_state == 0b10:
+            self.button_press_time = time.monotonic()
+            logging.info("Button down")
+
+        # Handle release (transition 0->1)
+        elif current_state == 0b01:
+            press_duration = time.monotonic() - self.button_press_time
+            logging.info("Button up")
+
+            # Check for long press
+            if press_duration >= (self.hold_time - 1):
                 if self.button_hold_callback:
                     self.button_hold_callback()
-        
+            else:
+                if self.button_press_callback:
+                    # Short press
+                    self.button_press_callback()
+
         self.last_button_state = current_state
-        
+
     def add_mode(self, mode):
         """
-        Добавление нового режима работы
-        
+        Add a new operating mode
+
         Args:
-            mode: Экземпляр класса, унаследованного от EncoderMode
+            mode: Instance of a class inherited from EncoderMode
         """
         mode_name = mode.get_name()
         self.modes[mode_name] = mode
         if self.current_mode is None:
             self.current_mode = mode_name
-    
-    def set_mode_handlers(self, mode_identifier, clockwise_handler, counterclockwise_handler):
+
+    def set_mode_handlers(self, mode_identifier,
+            clockwise_handler, counterclockwise_handler,
+            clockwise_boosthandler=None, counterclockwise_boosthandler=None
+        ):
         """
-        Установка обработчиков для конкретного режима
-        
+        Set rotation handlers for a specific mode, including optional boost handlers.
+
         Args:
-            mode_identifier: Имя режима или индекс
-            clockwise_handler: Функция для вращения по часовой стрелке
-            counterclockwise_handler: Функция для вращения против часовой стрелки
+            mode_identifier (str or int): Mode name or index.
+            clockwise_handler (callable): Function called on slow/normal clockwise rotation.
+            counterclockwise_handler (callable): Function called on slow/normal counterclockwise rotation.
+            clockwise_boosthandler (callable, optional): Function called on fast (boosted) clockwise rotation.
+            counterclockwise_boosthandler (callable, optional): Function called on fast (boosted) counterclockwise rotation.
         """
         mode = self._get_mode(mode_identifier)
         if mode:
-            mode.set_clockwise_handler(clockwise_handler)
-            mode.set_counterclockwise_handler(counterclockwise_handler)
-    
+            mode.set_clockwise_handler(clockwise_handler, 
+                                            boosthandler=clockwise_boosthandler)
+            mode.set_counterclockwise_handler(counterclockwise_handler, 
+                                     boosthandler=counterclockwise_boosthandler)
+
     def _get_mode(self, mode_identifier):
-        """Получение объекта режима по идентификатору"""
+        """Get mode object by identifier"""
         if isinstance(mode_identifier, int):
             mode_names = list(self.modes.keys())
             if 0 <= mode_identifier < len(mode_names):
@@ -236,149 +320,141 @@ class EncoderHandler:
         elif mode_identifier in self.modes:
             return self.modes[mode_identifier]
         return None
-    
+
     def set_mode(self, mode_identifier):
         """
-        Установка текущего режима работы
-        
+        Set the current operating mode
+
         Args:
-            mode_identifier: Имя режима или индекс в списке режимов
+            mode_identifier: Mode name or index in the list of modes
         """
+
         if isinstance(mode_identifier, int):
-            # По индексу
             mode_names = list(self.modes.keys())
             if 0 <= mode_identifier < len(mode_names):
                 self.current_mode = mode_names[mode_identifier]
                 self.mode_index = mode_identifier
         elif mode_identifier in self.modes:
-            # По имени
             self.current_mode = mode_identifier
             mode_names = list(self.modes.keys())
             self.mode_index = mode_names.index(mode_identifier)
-        
+
         if self.mode_change_callback:
             self.mode_change_callback(self.current_mode)
-    
+
     def next_mode(self):
-        """Переключение на следующий режим"""
+        """Switch to the next mode"""
         mode_names = list(self.modes.keys())
         if mode_names:
             self.mode_index = (self.mode_index + 1) % len(mode_names)
             self.current_mode = mode_names[self.mode_index]
-            
+
             if self.mode_change_callback:
                 self.mode_change_callback(self.current_mode)
-    
+
     def set_rotation_callback(self, callback):
-        """Установка callback для вращения энкодера"""
+        """Set callback for encoder rotation"""
         self.rotation_callback = callback
-    
+
     def set_button_press_callback(self, callback):
-        """Установка callback для короткого нажатия кнопки"""
+        """Set callback for short button press"""
         self.button_press_callback = callback
-    
+
     def set_button_hold_callback(self, callback):
-        """Установка callback для длинного нажатия кнопки"""
+        """Set callback for long button press"""
         self.button_hold_callback = callback
-    
+
     def set_mode_change_callback(self, callback):
-        """Установка callback для смены режима"""
+        """Set callback for mode change"""
         self.mode_change_callback = callback
-    
+
     def get_current_mode(self):
-        """Получение имени текущего режима"""
+        """Get the name of the current mode"""
         return self.current_mode
-    
+
     def get_available_modes(self):
-        """Получение списка доступных режимов"""
+        """Get a list of available modes"""
         return list(self.modes.keys())
 
-# Пример использования с полностью кастомными режимами
+
+# Usage example
 if __name__ == "__main__":
-    
-    # Конкретные функции-обработчики
+
+    # Concrete handler functions
     def volume_up():
-        print("Увеличиваем громкость")
-        # Здесь код для увеличения громкости
-    
+        print("Increasing volume")
+
     def volume_down():
-        print("Уменьшаем громкость")
-        # Здесь код для уменьшения громкости
-    
+        print("Decreasing volume")
+
     def brightness_up():
-        print("Увеличиваем яркость")
-        # Здесь код для увеличения яркости
-    
+        print("Increasing brightness")
+
     def brightness_down():
-        print("Уменьшаем яркость")
-        # Здесь код для уменьшения яркости
-    
-    def type_aa():
-        print("Вводим AA")
-        # Здесь код для ввода текста "AA"
-    
-    def type_bb():
-        print("Вводим BB")
-        # Здесь код для ввода текста "BB"
-    
+        print("Decreasing brightness")
+
     def on_rotation(action, direction):
         print(f"Encoder rotated {direction}: {action}")
-    
+
     def on_button_press():
         print("Button pressed - switching mode")
         encoder.next_mode()
-    
+
     def on_button_hold():
-        print("Button held - special action")
-        # Действие при длинном нажатии
-    
+        print("Button held - reset")
+
     def on_mode_change(mode_name):
         print(f"Mode changed to: {mode_name}")
-    
-    # Создание и настройка обработчика
-    encoder = EncoderHandler()  
-    
-    # Создание кастомных режимов
+
+    # Create a single encoder handler instance
+    encoder = EncoderHandler(pin_a=22, pin_b=23, pin_button=24, hold_time=2)
+
+    # Define custom modes
     class VolumeMode(EncoderMode):
         def get_name(self):
-            return "VolumeMode"
-    
+            return "volume"
+
     class BrightnessMode(EncoderMode):
         def get_name(self):
-            return "BrightnessMode"
-    
-    class TextMode(EncoderMode):
-        def get_name(self):
-            return "TextMode"
-    
-    # Добавление режимов в обработчик
-    volume_mode = VolumeMode()
-    brightness_mode = BrightnessMode()
-    text_mode = TextMode()
-    
+            return "brightness"
+
+    # Add modes to handler
+    volume_mode = VolumeMode(volume_up, volume_down)
+    brightness_mode = BrightnessMode(brightness_up, brightness_down)
+
     encoder.add_mode(volume_mode)
     encoder.add_mode(brightness_mode)
-    encoder.add_mode(text_mode)
-    
-    # Установка обработчиков для каждого режима
-    encoder.set_mode_handlers("VolumeMode", volume_up, volume_down)
-    encoder.set_mode_handlers("BrightnessMode", brightness_up, brightness_down)
-    encoder.set_mode_handlers("TextMode", type_aa, type_bb)
-    
-    # Установка callback функций для дополнительной обработки
+
+    # # Set handlers for each mode
+    # encoder.set_mode_handlers("volume", volume_up, volume_down)
+    # encoder.set_mode_handlers("brightness", brightness_up, brightness_down)
+
+    # Set initial mode
+    encoder.set_mode("volume")
+
+    # Set callback functions for additional processing
     encoder.set_rotation_callback(on_rotation)
     encoder.set_button_press_callback(on_button_press)
     encoder.set_button_hold_callback(on_button_hold)
     encoder.set_mode_change_callback(on_mode_change)
-    
-    # Запуск обработчика
+
+    # Start the handler
     encoder.start()
-    print("Encoder handler started. Press Ctrl+C to stop.")
-    
+    print("Encoder handler started with interrupts. Press Ctrl+C to stop.")
+
+    # Handle Ctrl+C for graceful shutdown
+    def signal_handler(sig, frame):
+        print("\nReceived Ctrl+C")
+        encoder.stop()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
     try:
-        # Главный цикл
+        # Main loop
         while True:
-            time.sleep(1)
+            # print("aaa")
+            time.sleep(10)
     except KeyboardInterrupt:
         print("Stopping...")
         encoder.stop()
