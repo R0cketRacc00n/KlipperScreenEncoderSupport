@@ -170,8 +170,6 @@ class KlipperScreen(Gtk.Window):
             pin_button = self._config.get_main_config().getint("encoder_pin_button", None)
             hold_time = self._config.get_main_config().getint("encoder_hold_time", None)
             self.encoder=self.init_encoder(pin_a=pin_a, pin_b=pin_b, pin_button=pin_button, hold_time=hold_time)
-            self.encoder_arrow_mode()
-            self.encoder_focus_mode()
             
         self.setup_gtk_settings()
         self.style_provider = Gtk.CssProvider()
@@ -263,6 +261,7 @@ class KlipperScreen(Gtk.Window):
                     try:
                         subprocess.run([tool, 'key', key_combo], check=False, 
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        logging.debug(f"key_press: {key_combo}")
                         return True
                     except Exception:
                         return False
@@ -276,17 +275,17 @@ class KlipperScreen(Gtk.Window):
 
         def encoder_arrow_mode(self):
             self.encoder.set_mode("ArrowVMode")
-            logging.info("Encoder ArrowVMode")
+            logging.debug("Encoder ArrowVMode")
             return False
 
         def encoder_horisontal_arrow_mode(self):
             self.encoder.set_mode("ArrowHMode")
-            logging.info("Encoder ArrowHMode")
+            logging.debug("Encoder ArrowHMode")
             return False
 
         def encoder_focus_mode(self):
             self.encoder.set_mode("FocusMode")
-            logging.info("Encoder FocusMode")
+            logging.debug("Encoder FocusMode")
             return False
 
         key_press = create_key_emulator(self.wayland)
@@ -294,7 +293,8 @@ class KlipperScreen(Gtk.Window):
         encoder = EncoderHandler(pin_a=pin_a, pin_b=pin_b, pin_button=pin_button, hold_time=hold_time)
         
         focusmode = FocusMode(lambda: key_press('Tab'), lambda: key_press('shift+Tab'))
-        arrowvmode = ArrowVMode(lambda: key_press('Down'), lambda: key_press('Up'))
+        arrowvmode = ArrowVMode(lambda: key_press('Down'), lambda: key_press('Up'), 
+                                lambda: key_press('Page_Down'), lambda: key_press('Page_Up'))
         arrowhmode = ArrowHMode(lambda: key_press('Left'), lambda: key_press('Right'))
         
         encoder.add_mode(focusmode)
