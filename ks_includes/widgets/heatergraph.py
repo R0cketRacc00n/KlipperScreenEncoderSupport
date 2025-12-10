@@ -10,7 +10,7 @@ from cairo import Context as cairoContext
 
 
 class HeaterGraph(Gtk.DrawingArea):
-    def __init__(self, screen, printer, font_size, fullscreen=False, store=None, can_focus=True):
+    def __init__(self, screen, printer, font_size, fullscreen=False, store=None, can_focus=False):
         super().__init__()
         self._gtk = screen.gtk
         self.set_hexpand(True)
