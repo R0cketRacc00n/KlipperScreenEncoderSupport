@@ -49,6 +49,8 @@ class ScreenSaver:
 
         close = Gtk.Button()
         close.connect("clicked", self.close)
+        if self.screen.encoder_support:
+            close.connect("key-press-event", lambda widget, event: self.close())
 
         box = Gtk.Box(
             halign=Gtk.Align.CENTER, width_request=self.screen.width, height_request=self.screen.height)
