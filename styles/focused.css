@@ -7,6 +7,10 @@
 		 }
 }
 
+grid button, grid button label  {
+	padding: 0px 0px;
+    margin: 0px 0px;
+}
 .heatergraph:focus,
 .spin-entry:focus:not(.active),
 scrolledwindow:focus:not(.active),
