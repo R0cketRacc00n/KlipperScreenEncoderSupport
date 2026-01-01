@@ -209,7 +209,10 @@ class Panel(ScreenPanel):
         if "create_profile" not in self.labels:
             pl = Gtk.Label(label=_("Profile Name:"), hexpand=False)
             self.labels['profile_name'] = Gtk.Entry(hexpand=True, text='')
-            self.labels['profile_name'].connect("activate", self.create_profile)
+            if not self.encoder_support:
+                self.labels['profile_name'].connect("activate", self.create_profile)
+            else:
+                self.labels['profile_name'].connect("activate", self.show_keyboard)
             self.labels['profile_name'].connect("touch-event", self._screen.show_keyboard)
             self.labels['profile_name'].connect("button-press-event", self._screen.show_keyboard)
 
@@ -229,6 +232,7 @@ class Panel(ScreenPanel):
         self.content.add(self.labels['create_profile'])
         self.labels['profile_name'].grab_focus_without_selecting()
         self.show_create = True
+        self.content.show_all() #show interface changes
 
     def create_profile(self, widget):
         name = self.labels['profile_name'].get_text()
@@ -267,3 +271,7 @@ class Panel(ScreenPanel):
     def send_remove_mesh(self, widget, profile):
         self._screen._send_action(widget, "printer.gcode.script", {"script": KlippyGcodes.bed_mesh_remove(profile)})
         self.remove_profile(profile)
+
+    def show_keyboard(self, entry):
+        entry.select_region(0, len(entry.get_text()))
+        self._screen.show_keyboard(entry=entry)

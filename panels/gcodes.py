@@ -142,7 +142,7 @@ class Panel(ScreenPanel):
         fbchild.set_path(path)
         fbchild.set_name(basename.casefold())
         if self.list_mode:
-            label = Gtk.Label(label=basename, hexpand=True, vexpand=False)
+            label = Gtk.Label(label=basename, hexpand=True, vexpand=False,)
             format_label(label)
             info = Gtk.Label(
                 hexpand=True, halign=Gtk.Align.START, xalign=0,
@@ -156,6 +156,9 @@ class Panel(ScreenPanel):
             rename = Gtk.Button(hexpand=False, vexpand=False, can_focus=False, always_show_image=True)
             rename.get_style_context().add_class("color2")
             rename.set_image(self._gtk.Image("files", self.list_button_size, self.list_button_size))
+            if self.encoder_support:
+                delete.set_can_focus(True)
+                rename.set_can_focus(True)
             itemname = Gtk.Label(hexpand=True, halign=Gtk.Align.START, ellipsize=Pango.EllipsizeMode.END)
             itemname.get_style_context().add_class("print-filename")
             itemname.set_markup(f"<big><b>{basename}</b></big>")
@@ -165,9 +168,16 @@ class Panel(ScreenPanel):
             if self._screen.width >= 400:
                 row.attach(icon, 0, 0, 1, 2)
             row.attach(itemname, 1, 0, 3, 1)
-            row.attach(info, 1, 1, 1, 1)
-            row.attach(rename, 2, 1, 1, 1)
-            row.attach(delete, 3, 1, 1, 1)
+            if not self.encoder_support:
+                row.attach(info, 1, 1, 1, 1)
+                row.attach(rename, 2, 1, 1, 1)
+                row.attach(delete, 3, 1, 1, 1)
+                x, y, w, h = 4, 0, 1, 2     # action button position 
+            else:
+                row.attach(info, 1, 1, 1, 2)
+                row.attach(rename, 2, 1, 1, 1)
+                row.attach(delete, 2, 2, 1, 1)
+                x, y, w, h = 3, 1, 1, 2     # action button position 
             if 'filename' in item:
                 icon.connect("clicked", self.confirm_print, path)
                 image_args = (path, icon, self.thumbsize / 2, True, "file")
@@ -180,10 +190,10 @@ class Panel(ScreenPanel):
                 action.set_vexpand(False)
                 action.set_halign(Gtk.Align.END)
                 if self._screen.width >= 400:
-                    row.attach(action, 4, 0, 1, 2)
+                    row.attach(action, x, y, w, h)
                 else:
                     icon.get_style_context().add_class("color3")
-                    row.attach(icon, 4, 0, 1, 2)
+                    row.attach(icon, x, y, w, h)
             elif 'dirname' in item:
                 icon.connect("clicked", self.change_dir, path)
                 image_args = (None, icon, self.thumbsize / 2, True, "folder")
@@ -194,7 +204,7 @@ class Panel(ScreenPanel):
                 action.set_hexpand(False)
                 action.set_vexpand(False)
                 action.set_halign(Gtk.Align.END)
-                row.attach(action, 4, 0, 1, 2)
+                row.attach(action, x, y, w, h)
             else:
                 return
             fbchild.add(row)
@@ -520,11 +530,15 @@ class Panel(ScreenPanel):
         self.labels['new_name'].set_text(fullpath[7:])
         self.labels['new_name'].grab_focus_without_selecting()
         self.showing_rename = True
+        self.content.show_all() #show interface changes
 
     def _create_rename_box(self, fullpath):
         lbl = Gtk.Label(label=_("Rename/Move:"), halign=Gtk.Align.START, hexpand=False)
         self.labels['new_name'] = Gtk.Entry(text=fullpath, hexpand=True)
-        self.labels['new_name'].connect("activate", self.rename)
+        if not self.encoder_support:
+            self.labels['new_name'].connect("activate", self.rename)
+        else:
+            self.labels['new_name'].connect("activate", self.show_keyboard)
         self.labels['new_name'].connect("touch-event", self._screen.show_keyboard)
         self.labels['new_name'].connect("button-press-event", self._screen.show_keyboard)
 
@@ -540,6 +554,12 @@ class Panel(ScreenPanel):
                                              hexpand=True, vexpand=True, valign=Gtk.Align.CENTER)
         self.labels['rename_file'].pack_start(lbl, True, True, 5)
         self.labels['rename_file'].pack_start(box, True, True, 5)
+
+    def show_keyboard(self, entry):
+        base, ext = os.path.splitext(entry.get_text())
+        position = len(base)
+        entry.select_region(0, position)
+        self._screen.show_keyboard(entry=entry)
 
     def hide_rename(self):
         self._screen.remove_keyboard()

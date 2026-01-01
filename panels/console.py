@@ -53,7 +53,10 @@ class Panel(ScreenPanel):
         entry.connect("button-press-event", self._screen.show_keyboard)
         entry.connect("touch-event", self._screen.show_keyboard)
         entry.connect("button-press-event", self._screen.show_keyboard)
-        entry.connect("activate", self._send_command)
+        if self.encoder_support:
+            entry.connect("activate", self._screen.show_keyboard)
+        else:
+            entry.connect("activate", self._send_command)
         entry.grab_focus_without_selecting()
 
         enter = self._gtk.Button("resume", " " + _('Send') + " ", None, .66, Gtk.PositionType.RIGHT, 1)

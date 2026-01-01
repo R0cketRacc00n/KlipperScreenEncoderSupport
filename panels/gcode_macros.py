@@ -4,7 +4,7 @@ import re
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib, Pango
+from gi.repository import Gtk, GLib, Pango, Gdk
 from ks_includes.screen_panel import ScreenPanel
 
 
@@ -112,8 +112,17 @@ class Panel(ScreenPanel):
             labels.add(Gtk.Label(param))
             self.macros[macro]["params"][param].connect("touch-event", self.show_keyboard)
             self.macros[macro]["params"][param].connect("button-press-event", self.show_keyboard)
-            self.macros[macro]["params"][param].connect("focus-out-event", self._screen.remove_keyboard)
+            if self.encoder_support:
+                self.macros[macro]["params"][param].connect("key-release-event", self.on_key_release)
+            else:
+                self.macros[macro]["params"][param].connect("focus-out-event", self._screen.remove_keyboard)
             labels.add(self.macros[macro]["params"][param])
+
+    def on_key_release(self, widget, event):
+        if event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            self.show_keyboard(widget, event)
+            return True
+        return False
 
     def show_keyboard(self, entry, event):
         self._screen.show_keyboard(entry, event)

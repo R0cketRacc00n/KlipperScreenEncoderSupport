@@ -308,9 +308,14 @@ class Panel(ScreenPanel):
         self.labels['network_identity'] = Gtk.Entry(hexpand=True, no_show_all=True)
         self.labels['network_identity'].connect("touch-event", self._screen.show_keyboard)
         self.labels['network_identity'].connect("button-press-event", self._screen.show_keyboard)
+        if self.encoder_support:
+            self.labels['network_identity'].connect("activate", self._screen.show_keyboard)
 
         self.labels['network_psk'] = Gtk.Entry(hexpand=True)
-        self.labels['network_psk'].connect("activate", self.add_new_network, ssid)
+        if not self.encoder_support:
+            self.labels['network_psk'].connect("activate", self.add_new_network, ssid)
+        else:
+            self.labels['network_psk'].connect("activate", self._screen.show_keyboard)
         self.labels['network_psk'].connect("touch-event", self._screen.show_keyboard)
         self.labels['network_psk'].connect("button-press-event", self._screen.show_keyboard)
 
