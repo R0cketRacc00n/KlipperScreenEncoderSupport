@@ -971,7 +971,8 @@ class KlipperScreen(Gtk.Window):
             self.printer.process_update(data)
             if 'manual_probe' in data and data['manual_probe']['is_active'] and 'zcalibrate' not in self._cur_panels:
                 self.show_panel("zcalibrate")
-            if ("screws_tilt_adjust" in data and not data['screws_tilt_adjust']['max_deviation']
+            if ("screws_tilt_adjust" in data and "max_deviation" in data['screws_tilt_adjust']
+                and not data['screws_tilt_adjust']['max_deviation']
                     and 'bed_level' not in self._cur_panels):
                 self.show_panel("bed_level")
         elif action == "notify_filelist_changed":
@@ -1447,10 +1448,10 @@ class KlipperScreen(Gtk.Window):
         new_mode = new_ratio < 1.0
         ratio_delta = abs(self.aspect_ratio - new_ratio)
         if ratio_delta > 0.1 and self.vertical_mode != new_mode:
-            self.reload_panels()
             self.vertical_mode = new_mode
             self.aspect_ratio = new_ratio
             logging.info(f"Vertical mode: {self.vertical_mode}")
+            self.reload_panels()
 
 
 def main():
