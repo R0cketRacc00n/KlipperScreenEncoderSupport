@@ -3,7 +3,7 @@ import os
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, GLib, Gdk
 
 
 class Keyboard(Gtk.Box):
@@ -21,6 +21,9 @@ class Keyboard(Gtk.Box):
         self.purpose = purpose
         self.box = box or None
 
+        self.first_key = None
+        self.last_key = None
+        self.encoder_support = screen.encoder_support
         language = self.detect_language(screen._config.get_main_config().get("language", None))
 
         if self.purpose == Gtk.InputPurpose.DIGITS:
@@ -144,9 +147,54 @@ class Keyboard(Gtk.Box):
                     self.buttons[p][r][k].connect('button-release-event', self.release)
                     self.buttons[p][r][k].get_style_context().add_class("keyboard_pad")
 
+                    if self.encoder_support:
+                        self.buttons[p][r][k].connect("key-press-event", self.on_key_press, key)
+                        self.buttons[p][r][k].connect("key-release-event", self.on_key_release)
+        if self.encoder_support:
+            self.connect("map", lambda w: self.set_key_focus())
         self.pallet_nr = -1
         self.set_pallet(0)
         self.add(self.keyboard)
+
+    def on_key_press(self, widget, event, key):
+        keyval = event.keyval
+
+        # Handle encoder or keyboard press
+        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            self.repeat(widget, event, key)
+            return True
+
+        # Keep focus within keyboard
+        elif keyval in (Gdk.KEY_Tab, Gdk.KEY_ISO_Left_Tab, Gdk.KEY_KP_Tab):
+            tab_backward = event.state & Gdk.ModifierType.SHIFT_MASK or keyval == Gdk.KEY_ISO_Left_Tab
+            if tab_backward:
+                if widget is self.first_key:
+                    self.last_key.grab_focus()
+                else:
+                    widget.get_parent().emit("move-focus", Gtk.DirectionType.TAB_BACKWARD)
+            else:
+                if widget is self.last_key:
+                    self.first_key.grab_focus()
+                else:
+                    widget.get_parent().emit("move-focus", Gtk.DirectionType.TAB_FORWARD)
+            return True
+        return True
+
+    def on_key_release(self, widget, event):
+        keyval = event.keyval
+        state = event.state
+        shift_pressed = bool(state & Gdk.ModifierType.SHIFT_MASK)
+        if event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            self.release(widget, event)
+            return True
+        elif keyval in (Gdk.KEY_Tab, Gdk.KEY_ISO_Left_Tab, Gdk.KEY_KP_Tab):
+            return True
+        return True
+
+    def set_key_focus(self):
+        row = len(self.buttons[self.pallet_nr])//2
+        col = len(self.buttons[self.pallet_nr][row])//2
+        self.buttons[self.pallet_nr][row][col].grab_focus()
 
     def reinit(self, close_cb, entry, box):
         self.close_cb = close_cb
@@ -180,6 +228,10 @@ class Keyboard(Gtk.Box):
                     if x > columns:
                         columns = x
             self.show_all()
+            if self.encoder_support:
+                self.first_key = self.buttons[p][0][0]
+                self.last_key = self.buttons[p][-1][-1]
+                self.set_key_focus()
             return
 
         for r, row in enumerate(self.keys[p][:-1]):
@@ -192,6 +244,10 @@ class Keyboard(Gtk.Box):
         self.keyboard.attach(self.buttons[p][3][1], 3, 4, -4 + columns, 1)  # Space
         self.keyboard.attach(self.buttons[p][3][2], -1 + columns, 4, 3, 1)  # ↓
         self.show_all()
+        if self.encoder_support:
+            self.first_key = self.buttons[p][0][0]
+            self.last_key = self.buttons[p][-1][-1]
+            self.set_key_focus()
 
     def repeat(self, widget, event, key):
         # Button-press
@@ -227,6 +283,8 @@ class Keyboard(Gtk.Box):
             Gtk.Entry.do_backspace(self.entry)
         elif key == "↓":
             widget.get_style_context().remove_class("active")
+            if self.encoder_support:
+                GLib.timeout_add(100, lambda e: e.grab_focus_without_selecting(), self.entry)
             self.close_cb(entry=self.entry, box=self.box)
             return
         elif key == "↑":
